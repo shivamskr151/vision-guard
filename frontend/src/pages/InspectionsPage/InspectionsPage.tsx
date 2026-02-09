@@ -37,8 +37,8 @@ const ActivityIcon = ({ size = 20, color = 'currentColor', style }: { size?: num
 const TrendingUpIcon = ({ size = 20, color = 'currentColor', style }: { size?: number; color?: string; style?: React.CSSProperties }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
 );
-const HouseIcon = ({ size = 14 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+const CameraIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
 );
 
 
@@ -89,7 +89,7 @@ export const InspectionsPage: React.FC = () => {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -438,7 +438,13 @@ export const InspectionsPage: React.FC = () => {
       </div>
 
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>Inspection Map</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h2 className={styles.sectionTitle}>Inspection Map</h2>
+          <div className={styles.liveIndicator}>
+            <span className={styles.liveDot} />
+            LIVE
+          </div>
+        </div>
         <p className={styles.sectionSubtitle}>Visual overview of inspection status by facility zone.</p>
       </div>
       <div className={styles.mapContainer}>
@@ -459,33 +465,51 @@ export const InspectionsPage: React.FC = () => {
             </div>
           ))}
         </div>
-        <div className={styles.mapPoints}>
-          <div className={styles.mapPoints}>
-            {(dashboardData?.mapData || []).map((point: any) => (
-              <div
-                key={point.id}
-                className={`${styles.mapPoint} ${point.status === 'good' ? styles.mapPointCamera : styles.mapPointInspectionDue}`}
-                style={{
-                  left: `${point.x}%`,
-                  top: `${point.y}%`,
-                  backgroundColor: point.status === 'overdue' ? '#ef4444' : undefined // Red override for overdue
-                }}
-                title={`${point.name} (${point.status})`}
-              >
-                <HouseIcon size={12} />
-              </div>
-            ))}
-          </div>
+        <div className={styles.markers}>
+          {(dashboardData?.mapData || []).map((point: any) => (
+            <div
+              key={point.id}
+              className={styles.marker}
+              style={{
+                left: `${point.x}%`,
+                top: `${point.y}%`,
+              }}
+              title={`${point.name} (${point.healthStatus || 'N/A'})`}
+            >
+              {/* Camera Icon Layer */}
+              {point.hasCamera && (
+                <span className={styles.markerCamera}>
+                  <CameraIcon size={12} />
+                </span>
+              )}
+
+              {/* Inspection Due Layer */}
+              {point.inspectionDue && (
+                <span className={styles.markerInspectionDue}>
+                  <span className={styles.markerPulse} />
+                  <AlertTriangleIcon size={10} color="#1c1917" />
+                </span>
+              )}
+
+              {/* Asset Health Layer */}
+              {point.healthStatus && point.healthStatus !== 'good' && (
+                <span className={`${styles.markerStatus} ${styles[`marker${point.healthStatus.charAt(0).toUpperCase()}${point.healthStatus.slice(1)}`]}`} />
+              )}
+
+              {/* Asset Name Label */}
+              <span className={styles.markerLabel}>{point.name}</span>
+            </div>
+          ))}
         </div>
         <div className={styles.mapLegend}>
           <div className={styles.mapLegendTitle}>Map Legend</div>
           <div className={styles.mapLegendItems}>
             <div className={styles.mapLegendItem}>
-              <span className={`${styles.mapLegendDot} ${styles.mapLegendDotCamera}`} aria-hidden />
+              <span className={styles.legendIconCamera}><CameraIcon size={12} /></span>
               Active Camera
             </div>
             <div className={styles.mapLegendItem}>
-              <span className={`${styles.mapLegendDot} ${styles.mapLegendDotDue}`} aria-hidden />
+              <span className={styles.legendIconDue}><AlertTriangleIcon size={10} color="#1c1917" /></span>
               Inspection Due
             </div>
           </div>

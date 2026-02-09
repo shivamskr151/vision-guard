@@ -45,6 +45,8 @@ export class TelemetryProducerService implements OnModuleInit {
                 const inspectionCompliance = parseFloat(values[4]);
                 const criticalAssetRiskIndex = parseFloat(values[5]);
 
+                const status = activeAnomalies > 150 ? 'critical' : (activeAnomalies > 100 ? 'warning' : 'normal');
+
                 const payload = {
                     timestamp: new Date().toISOString(),
                     assetId,
@@ -52,7 +54,8 @@ export class TelemetryProducerService implements OnModuleInit {
                     assetOverdue,
                     activeAnomalies,
                     inspectionCompliance,
-                    criticalAssetRiskIndex
+                    criticalAssetRiskIndex,
+                    status
                 };
 
                 this.kafkaClient.emit('asset_telemetry', payload);

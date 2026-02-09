@@ -272,6 +272,10 @@ export class InspectionsService implements OnModuleInit {
           orderBy: { scheduledDate: 'desc' },
           take: 1
         },
+        telemetry: {
+          orderBy: { timestamp: 'desc' },
+          take: 1
+        }
       }
     });
 
@@ -284,27 +288,31 @@ export class InspectionsService implements OnModuleInit {
     const anomalyAssetMap = new Map(activeAnomaliesByAsset.map(a => [a.assetId, a._count]));
 
     const mapData = assets.map(asset => {
-      let isInspectionDue = false;
+      const latestTelemetry = asset.telemetry[0];
       const latestInspection = asset.inspections[0];
-
-      if (latestInspection) {
+      
+      let isInspectionDue = false;
+      if (latestTelemetry && latestTelemetry.assetInspection !== null) {
+        isInspectionDue = latestTelemetry.assetInspection > 0;
+      } else if (latestInspection) {
         const today = new Date();
         const dueDate = new Date(latestInspection.scheduledDate);
         const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
-
         if (latestInspection.status !== 'completed' && diffDays <= 7) {
           isInspectionDue = true;
         }
       }
+
+      const healthStatus = latestTelemetry?.status || asset.healthStatus || 'good';
 
       return {
         id: asset.id,
         assetId: asset.assetId,
         x: asset.x,
         y: asset.y,
-        healthStatus: asset.healthStatus, // 'good', 'warning', 'critical'
+        healthStatus, // 'good', 'warning', 'critical'
         inspectionDue: isInspectionDue,
-        hasAnomaly: anomalyAssetMap.has(asset.assetId),
+        hasAnomaly: anomalyAssetMap.has(asset.assetId) || (latestTelemetry?.activeAnomalies && latestTelemetry.activeAnomalies > 0),
         hasCamera: (asset.linkedCameras || 0) > 0,
         type: asset.type,
         name: asset.name
