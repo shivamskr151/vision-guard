@@ -1,0 +1,88 @@
+/* Design tokens – single source of truth for theme */
+
+:root {
+  /* Surfaces */
+  --color-bg-base: #0f1419;
+  --color-bg-elevated: #1a2332;
+  --color-bg-card: #1e2a3a;
+  --color-bg-sidebar: #131b26;
+
+  /* Borders & dividers */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.12);
+
+  /* Text */
+  --color-text-primary: rgba(255, 255, 255, 0.95);
+  --color-text-secondary: rgba(255, 255, 255, 0.7);
+  --color-text-muted: rgba(255, 255, 255, 0.5);
+
+  /* Brand & accents */
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-accent-active: #1d4ed8;
+
+  /* KPI card variants */
+  --kpi-assets-bg: #1e3a5f;
+  --kpi-assets-icon: #60a5fa;
+  --kpi-due-bg: #14532d;
+  --kpi-due-icon: #4ade80;
+  --kpi-overdue-bg: #7f1d1d;
+  --kpi-overdue-icon: #fca5a5;
+  --kpi-anomalies-bg: #4c1d95;
+  --kpi-anomalies-icon: #c084fc;
+  --kpi-compliance-bg: linear-gradient(135deg, #78350f 0%, #a16207 100%);
+  --kpi-compliance-icon: #fbbf24;
+  --kpi-risk-bg: #5c1a1a;
+  --kpi-risk-icon: #f87171;
+
+  /* Status */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Typography */
+  --font-sans: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, Oxygen, Ubuntu, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  /* Shadows */
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.25);
+  --shadow-card-hover: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  /* Sub-nav (sidebar) */
+  --color-subnav-active-bg: rgba(59, 130, 246, 0.15);
+  --color-subnav-active-text: #93c5fd;
+
+  /* Layout */
+  --sidebar-width: 240px;
+  --header-height: 56px;
+}

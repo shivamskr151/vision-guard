@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AnomalyEvent {
+  id          Int      @id @default(autoincrement())
+  timestamp   DateTime
+  severity    String
+  type        String
+  description String
+  assetId     String
+  location    String
+  confidence  Float
+  isResolved  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Asset {
+  id          Int      @id @default(autoincrement())
+  assetId     String   @unique
+  name        String
+  type        String
+  zone        String
+  healthStatus String // 'good' | 'warning' | 'critical'
+  linkedCameras Int      @default(0)
+  criticality Int
+  criticalityMax Int     @default(10)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  inspections Inspection[]
+  assignedTemplates InspectionTemplate[]
+  customData  Json?
+  lastInspectionDate DateTime?
+  inspectionFrequency Int?
+  x           Float    @default(0)
+  y           Float    @default(0)
+  telemetry   AssetTelemetry[]
+}
+
+model SchemaLibrary {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  fieldCount  Int
+  tags        String[]
+  created     String   // Keeping as string to match mock for now, or could parse to DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  fields      CustomField[]
+}
+
+model CustomField {
+  id          Int      @id @default(autoincrement())
+  label       String
+  type        String
+  required    Boolean
+  options     String[]
+  schemaId    Int?
+  schema      SchemaLibrary? @relation(fields: [schemaId], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model InspectionTemplate {
+  id              Int      @id @default(autoincrement())
+  title           String
+  description     String
+  questionCount   Int
+  durationMinutes Int
+  tags            String[]
+  frequencyDays   Int
+  mandatoryChecks Int
+  mandatoryTotal  Int
+  created         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  checklist       InspectionChecklist[]
+  assets          Asset[]
+}
+
+model InspectionChecklist {
+  id                Int      @id @default(autoincrement())
+  text              String
+  mandatory         Boolean
+  passFailCondition Boolean
+  templateId        Int
+  template          InspectionTemplate @relation(fields: [templateId], references: [id])
+}
+
+model Inspection {
+  id              Int      @id @default(autoincrement())
+  assetId         String
+  asset           Asset    @relation(fields: [assetId], references: [assetId])
+  inspectorId     String?
+  type            String   @default("Routine") // Newly added field
+  status          String   // 'scheduled' | 'in-progress' | 'completed' | 'overdue' | 'missed'
+  result          String?  // 'pass' | 'fail' | 'warning'
+  scheduledDate   DateTime
+  completedDate   DateTime?
+  durationSeconds Int?
+  notes           String?
+  checklistData   Json?    // Stores the filled checklist
+  defects         Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Zone {
+  id          Int      @id @default(autoincrement())
+  zoneId      String   @unique
+  label       String
+  x           Float
+  y           Float
+  width       Float
+  height      Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AssetTelemetry {
+  id          Int      @id @default(autoincrement())
+  timestamp   DateTime
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [assetId])
+
+  assetInspection Int?
+  assetOverdue    Int?
+  activeAnomalies Int?
+  inspectionCompliance Float?
+  criticalAssetRiskIndex Float?
+  status      String?   // 'normal', 'warning', 'critical'
+  createdAt   DateTime @default(now())
+}

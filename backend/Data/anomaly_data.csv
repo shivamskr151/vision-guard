@@ -1,0 +1,6 @@
+assetId,type,severity,description,location,confidence
+AST-002,cracking,minor,Minor hairline crack detected on surface,North Plant,0.85
+AST-004,overheating,critical,Critical temperature spike detected in core,South Plant,0.95
+AST-001,vibration,warning,Unusual vibration pattern accumulating,East Wing,0.78
+AST-003,noise,minor,Slight increase in operational noise,West Wing,0.82
+AST-005,misalignment,major,Component misalignment detected during rotation,Assembly Line A,0.91

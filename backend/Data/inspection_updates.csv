@@ -1,0 +1,41 @@
+inspectionId,assetId,inspectorId,type,status,result,scheduledDate,completedDate,durationSeconds,defects,notes
+1,AST-001,INSP-01,Routine,completed,pass,2026-02-08,2026-02-08,1800,0,All systems normal
+2,AST-002,INSP-02,Emergency,in-progress,null,2026-02-09,null,null,0,Investigating leak
+3,AST-003,INSP-03,Routine,overdue,null,2026-01-15,null,null,0,Awaiting parts
+4,AST-004,INSP-01,Routine,completed,pass,2026-02-05,2026-02-05,2100,0,No issues found
+5,AST-005,INSP-04,Routine,scheduled,null,2026-02-12,null,null,0,Upcoming inspection
+6,AST-006,INSP-02,Emergency,completed,fail,2026-01-20,2026-01-21,3600,2,Valve replacement needed
+7,AST-007,INSP-03,Routine,completed,warning,2026-02-03,2026-02-03,1950,1,Minor wear detected
+8,AST-008,INSP-01,Routine,completed,pass,2026-02-06,2026-02-06,1680,0,Boiler functioning well
+9,AST-009,INSP-04,Routine,scheduled,null,2026-02-11,null,null,0,Scheduled maintenance
+10,AST-010,INSP-02,Routine,completed,pass,2026-02-08,2026-02-08,1500,0,Tank inspection clear
+11,AST-011,INSP-03,Emergency,overdue,null,2026-01-10,null,null,0,Critical reactor check needed
+12,AST-012,INSP-01,Routine,completed,pass,2026-02-04,2026-02-04,1920,0,Separator working properly
+13,AST-013,INSP-04,Routine,completed,pass,2026-02-07,2026-02-07,1740,0,Mixer operational
+14,AST-014,INSP-02,Routine,scheduled,null,2026-02-13,null,null,0,Dryer inspection due
+15,AST-015,INSP-03,Routine,completed,pass,2026-02-08,2026-02-08,1560,0,Filter clean
+16,AST-016,INSP-01,Routine,completed,pass,2026-02-02,2026-02-02,1800,0,Heater check complete
+17,AST-017,INSP-04,Emergency,in-progress,null,2026-02-09,null,null,0,Cooler temperature issue
+18,AST-018,INSP-02,Routine,completed,pass,2026-02-05,2026-02-05,2040,0,Extruder running smoothly
+19,AST-019,INSP-03,Routine,completed,pass,2026-02-06,2026-02-06,1860,0,Press inspection passed
+20,AST-020,INSP-01,Routine,completed,pass,2026-02-09,2026-02-09,1440,0,Silo storage verified
+21,AST-001,INSP-02,Routine,scheduled,null,2026-03-01,null,null,0,Next scheduled check
+22,AST-002,INSP-03,Routine,scheduled,null,2026-02-15,null,null,0,Follow-up inspection
+23,AST-003,INSP-01,Emergency,scheduled,null,2026-02-10,null,null,0,Urgent compressor check
+24,AST-004,INSP-04,Routine,scheduled,null,2026-03-05,null,null,0,Regular maintenance
+25,AST-005,INSP-02,Routine,scheduled,null,2026-04-07,null,null,0,Quarterly inspection
+26,AST-006,INSP-03,Routine,scheduled,null,2026-02-14,null,null,0,Post-repair verification
+27,AST-007,INSP-01,Routine,scheduled,null,2026-03-03,null,null,0,Monthly check
+28,AST-008,INSP-04,Routine,scheduled,null,2026-03-06,null,null,0,Boiler safety check
+29,AST-009,INSP-02,Routine,scheduled,null,2026-02-25,null,null,0,Bi-weekly inspection
+30,AST-010,INSP-03,Routine,scheduled,null,2026-05-08,null,null,0,Quarterly tank inspection
+31,AST-001,INSP-01,Routine,completed,pass,2026-01-15,2026-01-15,1750,0,Previous inspection passed
+32,AST-002,INSP-02,Routine,completed,warning,2026-01-10,2026-01-11,2200,1,Minor leak detected
+33,AST-003,INSP-03,Routine,missed,null,2026-01-05,null,null,0,Inspection not performed
+34,AST-004,INSP-04,Routine,completed,pass,2026-01-20,2026-01-20,1890,0,Generator check OK
+35,AST-005,INSP-01,Routine,completed,pass,2026-01-25,2026-01-25,1620,0,Conveyor inspection clear
+36,AST-006,INSP-02,Routine,completed,fail,2026-01-08,2026-01-09,4200,3,Multiple valve issues
+37,AST-007,INSP-03,Routine,completed,pass,2026-01-18,2026-01-18,1780,0,Motor running well
+38,AST-008,INSP-04,Routine,completed,pass,2026-01-22,2026-01-22,1650,0,Boiler pressure normal
+39,AST-009,INSP-01,Routine,completed,warning,2026-01-12,2026-01-13,2400,1,Chiller efficiency low
+40,AST-010,INSP-02,Routine,completed,pass,2026-01-28,2026-01-28,1500,0,Tank levels good

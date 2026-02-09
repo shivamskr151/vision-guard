@@ -1,0 +1,201 @@
+.page {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.pageHeader {
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  /* Full-bleed underline: extend to content edges */
+  margin-left: calc(-1 * var(--space-6) - max(0px, (100vw - var(--sidebar-width) - 2*var(--space-6) - 1600px) / 2));
+  margin-right: calc(-1 * var(--space-6) - max(0px, (100vw - var(--sidebar-width) - 2*var(--space-6) - 1600px) / 2));
+  padding-left: calc(var(--space-6) + max(0px, (100vw - var(--sidebar-width) - 2*var(--space-6) - 1600px) / 2));
+  padding-right: calc(var(--space-6) + max(0px, (100vw - var(--sidebar-width) - 2*var(--space-6) - 1600px) / 2));
+}
+
+.pageHeaderTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin-bottom: var(--space-4);
+}
+
+.pageTitle {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--space-1) 0;
+  line-height: 1.25;
+}
+
+.pageSubtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.statusItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: 999px;
+}
+
+/* 7 Cameras Live: solid dark blue-green background, white text */
+.statusItemLive {
+  background: #0d4f3d;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: white;
+}
+
+.statusDotGreen {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+  flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* 5 Active Events: transparent/dark with vibrant red border, red text */
+.statusItemEvents {
+  background: transparent;
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+}
+
+.statusIconRed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-danger);
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Filters */
+.filtersRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.filterIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.filterLabel {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.filterSelect {
+  padding: var(--space-2) var(--space-4);
+  padding-right: var(--space-8);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  appearance: auto;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.filterSelect:hover {
+  border-color: var(--color-text-muted);
+}
+
+.filterSelect:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Sections */
+.section {
+  margin-bottom: var(--space-10);
+}
+
+.sectionLast {
+  margin-bottom: 0;
+}
+
+.sectionTitle {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-2) 0;
+  letter-spacing: -0.01em;
+}
+
+.sectionSubtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4) 0;
+}
+
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .twoCol {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cameraStreamsScroll,
+.eventFeedScroll {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+.cameraStreamsScroll::-webkit-scrollbar,
+.eventFeedScroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cameraStreamsScroll::-webkit-scrollbar-track,
+.eventFeedScroll::-webkit-scrollbar-track {
+  background: var(--color-bg-base);
+  border-radius: 4px;
+}
+
+.cameraStreamsScroll::-webkit-scrollbar-thumb,
+.eventFeedScroll::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 4px;
+}
+
+.cameraStreamsScroll::-webkit-scrollbar-thumb:hover,
+.eventFeedScroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}

@@ -1,0 +1,44 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+}
+
+.skipLink {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-bg-base);
+  background: var(--color-accent);
+  border-radius: 0 0 var(--radius-md) 0;
+  text-decoration: none;
+  transform: translateY(-100%);
+  transition: transform var(--transition-fast);
+}
+
+.skipLink:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+.main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-bg-base);
+}
+
+.content {
+  flex: 1;
+  padding: var(--space-6);
+  overflow: auto;
+  transition: opacity var(--transition-fast);
+}

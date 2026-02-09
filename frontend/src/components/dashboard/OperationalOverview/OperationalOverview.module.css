@@ -1,0 +1,77 @@
+.page {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  /* Full-bleed underline: extend to content edges (sidebar to right edge) */
+  margin-left: calc(-1 * var(--space-6) - max(0px, (100vw - var(--sidebar-width) - 2*var(--space-6) - 1600px) / 2));
+  margin-right: calc(-1 * var(--space-6) - max(0px, (100vw - var(--sidebar-width) - 2*var(--space-6) - 1600px) / 2));
+  padding-left: calc(var(--space-6) + max(0px, (100vw - var(--sidebar-width) - 2*var(--space-6) - 1600px) / 2));
+  padding-right: calc(var(--space-6) + max(0px, (100vw - var(--sidebar-width) - 2*var(--space-6) - 1600px) / 2));
+}
+
+.titles h1 {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--space-1) 0;
+  line-height: 1.25;
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.timeFilters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.timeBtn {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.timeBtn:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.timeBtnActive {
+  color: white;
+  background: var(--color-accent);
+}
+
+.timeBtnActive:hover {
+  color: white;
+  background: var(--color-accent-hover);
+}
+
+.timeBtn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

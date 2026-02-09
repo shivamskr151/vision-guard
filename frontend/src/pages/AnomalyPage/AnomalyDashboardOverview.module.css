@@ -1,0 +1,93 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  position: relative;
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  height: 120px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--transition-normal), transform var(--transition-normal);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+.cardTotal {
+  background: #7f1d1d;
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.cardCritical {
+  background: #7f1d1d;
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.cardAffected {
+  background: #78350f;
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+.cardCameras {
+  background: linear-gradient(135deg, #78350f 0%, #92400e 100%);
+  border-color: rgba(251, 191, 36, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 0 20px rgba(245, 158, 11, 0.06);
+}
+
+.title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: white;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.cardCameras .title {
+  color: white;
+}
+
+.value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: white;
+  letter-spacing: -0.02em;
+}
+
+.cardCameras .value {
+  color: white;
+}
+
+.icon {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  opacity: 0.9;
+}
+
+.cardWrap {
+  position: relative;
+}
