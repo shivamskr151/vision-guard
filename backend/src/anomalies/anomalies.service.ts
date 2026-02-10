@@ -3,6 +3,8 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 
+import { EventsGateway } from '../events/events.gateway';
+
 @Injectable()
 export class AnomaliesService {
     private readonly logger = new Logger(AnomaliesService.name);
@@ -10,6 +12,7 @@ export class AnomaliesService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly elasticsearchService: ElasticsearchService,
+        private readonly eventsGateway: EventsGateway,
     ) { }
 
     @EventPattern('anomaly_events')
@@ -48,6 +51,9 @@ export class AnomaliesService {
                 },
             });
             this.logger.log('Indexed Anomaly in Elasticsearch');
+
+            // Emit Real-time Update
+            this.eventsGateway.broadcast('anomaly', savedData);
 
         } catch (error) {
             this.logger.error('Error processing anomaly data', error);

@@ -96,9 +96,6 @@ export function InspectionReportsPage() {
     }
 
     fetchReports()
-    // Poll for updates
-    const interval = setInterval(fetchReports, 5000)
-    return () => clearInterval(interval)
   }, [])
 
   const filteredReports = useMemo(() => {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSocket } from '@/context/SocketContext';
 import type { KPICardData, MapMarker } from '@/types';
 
 export function useDashboardData() {
@@ -118,10 +119,49 @@ export function useDashboardData() {
         };
 
         fetchData();
-        // Poll every 5 seconds
-        const interval = setInterval(fetchData, 5000);
-        return () => clearInterval(interval);
     }, []);
+
+    const { lastTelemetry, lastAnomaly } = useSocket();
+
+    // Real-time Telemetry Updates
+    useEffect(() => {
+        if (!lastTelemetry) return;
+
+        setMapMarkers((prev) => prev.map((marker) => {
+            if (marker.name === lastTelemetry.assetId) {
+                return {
+                    ...marker,
+                    assetStatus: lastTelemetry.status,
+                    // potential other updates
+                };
+            }
+            return marker;
+        }));
+    }, [lastTelemetry]);
+
+    // Real-time Anomaly Updates
+    useEffect(() => {
+        if (!lastAnomaly) return;
+
+        setMapMarkers((prev) => prev.map((marker) => {
+            if (marker.name === lastAnomaly.assetId) {
+                return {
+                    ...marker,
+                    hasAnomaly: !lastAnomaly.isResolved,
+                };
+            }
+            return marker;
+        }));
+
+        // Dynamically update Active Anomalies KPI
+        setKpiCards((prev) => prev.map((card) => {
+            if (card.id === 'anomalies' && !lastAnomaly.isResolved) {
+                const val = parseInt(card.value.replace(/,/g, '')) || 0;
+                return { ...card, value: (val + 1).toString() };
+            }
+            return card;
+        }));
+    }, [lastAnomaly]);
 
     return { kpiCards, mapMarkers, mapRegions, mapFilters, mapLegend, loading, error };
 }

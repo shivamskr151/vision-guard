@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSocket } from '@/context/SocketContext';
 import {
   BarChart,
   Bar,
@@ -89,9 +90,71 @@ export const InspectionsPage: React.FC = () => {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 2000);
-    return () => clearInterval(interval);
   }, []);
+
+  const { lastTelemetry, lastAnomaly, lastInspectionStats } = useSocket();
+
+  // Real-time updates for Map Markers from Telemetry
+  useEffect(() => {
+    if (!lastTelemetry || !dashboardData) return;
+
+    setDashboardData((prev: any) => {
+      if (!prev || !prev.mapData) return prev;
+      return {
+        ...prev,
+        mapData: prev.mapData.map((point: any) => {
+          if (point.name === lastTelemetry.assetId) {
+            return {
+              ...point,
+              healthStatus: lastTelemetry.status,
+            };
+          }
+          return point;
+        })
+      };
+    });
+  }, [lastTelemetry]);
+
+  // Real-time updates for Map Markers & KPIs from Anomaly
+  useEffect(() => {
+    if (!lastAnomaly || !dashboardData) return;
+
+    setDashboardData((prev: any) => {
+      if (!prev || !prev.mapData) return prev;
+      return {
+        ...prev,
+        mapData: prev.mapData.map((point: any) => {
+          if (point.name === lastAnomaly.assetId) {
+            return {
+              ...point,
+              hasAnomaly: !lastAnomaly.isResolved
+            };
+          }
+          return point;
+        }),
+        kpi: {
+          ...prev.kpi,
+          overdue: !lastAnomaly.isResolved ? (prev.kpi.overdue || 0) + 1 : prev.kpi.overdue,
+        }
+      };
+    });
+  }, [lastAnomaly]);
+
+  useEffect(() => {
+    if (!lastInspectionStats || !dashboardData) return;
+
+    setDashboardData((prev: any) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        // Override graph data with real-time stats from ES
+        timeline: lastInspectionStats.timeline || prev.timeline,
+        zoneCoverage: lastInspectionStats.zoneCoverage || prev.zoneCoverage,
+        complianceTrend: lastInspectionStats.complianceTrend || prev.complianceTrend,
+        typeDistribution: lastInspectionStats.typeDistribution || prev.typeDistribution
+      };
+    });
+  }, [lastInspectionStats]);
 
   const handleExport = () => {
     if (!dashboardData) return;

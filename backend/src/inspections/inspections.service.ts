@@ -160,104 +160,6 @@ export class InspectionsService implements OnModuleInit {
 
 
 
-    // Timeline: Inspections scheduled per day for next 30 days (ES)
-    const timeline = await this.elasticsearchService.search({
-      index: 'inspections',
-      body: {
-        size: 0,
-        query: {
-          range: {
-            scheduledDate: {
-              gte: 'now-30d',
-              lte: 'now+30d'
-            }
-          }
-        },
-        aggs: {
-          inspections_over_time: {
-            date_histogram: {
-              field: 'scheduledDate',
-              calendar_interval: 'day'
-            }
-          }
-        }
-      }
-    } as any);
-
-    const timelineAggs = timeline.aggregations as any;
-    const timelineData = timelineAggs?.inspections_over_time?.buckets.map((b: any) => ({
-      label: new Date(b.key_as_string).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-      count: b.doc_count
-    })) || [];
-
-    // Asset Type Distribution (ES)
-    const typeDist = await this.elasticsearchService.search({
-      index: 'inspections',
-      body: {
-        size: 0,
-        aggs: {
-          types: {
-            terms: { field: 'type' }
-          }
-        }
-      }
-    } as any);
-
-    const typeAggs = typeDist.aggregations as any;
-    const typeData = typeAggs?.types?.buckets.map((b: any) => ({
-      type: b.key,
-      value: b.doc_count,
-      percentage: 0
-    })) || [];
-
-    const totalTypes = typeData.reduce((sum: number, item: any) => sum + item.value, 0);
-    typeData.forEach((item: any) => item.percentage = totalTypes > 0 ? Math.round((item.value / totalTypes) * 100) : 0);
-    // Add colors 
-    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-    typeData.forEach((item: any, index: number) => item.color = colors[index % colors.length]);
-
-    // Fetch all inspections for aggregation
-    const allInspections = await this.prisma.inspection.findMany({
-      include: { asset: true }
-    });
-
-    // 1. Zone Coverage Calculation (DB)
-    const zoneMap = new Map<string, { total: number, completed: number }>();
-    allInspections.forEach(insp => {
-      const zone = insp.asset?.zone || 'Unknown';
-      if (!zoneMap.has(zone)) zoneMap.set(zone, { total: 0, completed: 0 });
-      const stats = zoneMap.get(zone)!;
-      stats.total++;
-      if (insp.status === 'completed') stats.completed++;
-    });
-
-    const zoneData = Array.from(zoneMap.entries()).map(([zone, stats]) => ({
-      zone,
-      percentage: Math.round((stats.completed / (stats.total || 1)) * 100)
-    }));
-
-    // 2. Compliance Trend Calculation (Last 6 Months) (DB)
-    const trendMap = new Map<string, { total: number, completed: number, order: number }>();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-    allInspections.forEach(insp => {
-      const date = new Date(insp.scheduledDate);
-      const monthIndex = date.getMonth();
-      const monthName = months[monthIndex];
-
-      if (!trendMap.has(monthName)) trendMap.set(monthName, { total: 0, completed: 0, order: monthIndex });
-      const stats = trendMap.get(monthName)!;
-      stats.total++;
-      if (insp.status === 'completed') stats.completed++;
-    });
-
-    const complianceTrend = Array.from(trendMap.values())
-      .sort((a, b) => a.order - b.order)
-      .map(stats => ({
-        month: months[stats.order],
-        value: Math.round((stats.completed / (stats.total || 1)) * 100)
-      }));
-
     // Average Duration
     const avgDurationAgg = await this.prisma.inspection.aggregate({
       _avg: { durationSeconds: true },
@@ -290,7 +192,7 @@ export class InspectionsService implements OnModuleInit {
     const mapData = assets.map(asset => {
       const latestTelemetry = asset.telemetry[0];
       const latestInspection = asset.inspections[0];
-      
+
       let isInspectionDue = false;
       if (latestTelemetry && latestTelemetry.assetInspection !== null) {
         isInspectionDue = latestTelemetry.assetInspection > 0;
@@ -337,6 +239,9 @@ export class InspectionsService implements OnModuleInit {
     // Recent Compliance (SLA) - Last 30 days
     const slaCompliance = totalLast30 > 0 ? ((completedLast30 / totalLast30) * 100).toFixed(1) : '100.0';
 
+    // Fetch Graph Data from Elasticsearch (Centralized method)
+    const graphData = await this.getRealtimeGraphsData();
+
     return {
       kpi: {
         totalAssets,
@@ -348,10 +253,8 @@ export class InspectionsService implements OnModuleInit {
         riskIndex,
         averageDuration: avgDuration
       },
-      timeline: timelineData,
-      zoneCoverage: zoneData,
-      typeDistribution: typeData,
-      complianceTrend: complianceTrend,
+      // Spread graph data (timeline, zoneCoverage, typeDistribution, complianceTrend)
+      ...graphData,
       mapData: mapData,
       mapZones: dbZones.map(z => ({
         id: z.zoneId,
@@ -399,6 +302,133 @@ export class InspectionsService implements OnModuleInit {
         status: i.status === 'overdue' ? 'overdue' : (daysDiff <= 2 ? 'urgent' : 'due')
       };
     });
+  }
+
+  async getRealtimeGraphsData() {
+    // 1. Timeline: Inspections scheduled per day for next 30 days
+    const timelineRes = await this.elasticsearchService.search({
+      index: 'inspections',
+      body: {
+        size: 0,
+        query: {
+          range: {
+            scheduledDate: {
+              gte: 'now-30d',
+              lte: 'now+30d'
+            }
+          }
+        },
+        aggs: {
+          inspections_over_time: {
+            date_histogram: {
+              field: 'scheduledDate',
+              calendar_interval: 'day'
+            }
+          }
+        }
+      }
+    } as any);
+
+    const timelineAggs = (timelineRes.aggregations as any)?.inspections_over_time?.buckets || [];
+    const timelineData = timelineAggs.map((b: any) => ({
+      label: new Date(b.key_as_string).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      count: b.doc_count
+    }));
+
+    // 2. Zone Coverage: % Completed / Total per Zone
+    const zoneCoverageRes = await this.elasticsearchService.search({
+      index: 'inspections',
+      body: {
+        size: 0,
+        aggs: {
+          zones: {
+            terms: { field: 'zone', size: 20 },
+            aggs: {
+              completed: {
+                filter: { term: { status: 'completed' } }
+              }
+            }
+          }
+        }
+      }
+    } as any);
+
+    const zoneAggs = (zoneCoverageRes.aggregations as any)?.zones?.buckets || [];
+    const zoneCoverageData = zoneAggs.map((b: any) => ({
+      zone: b.key || 'Unknown',
+      percentage: Math.round((b.completed.doc_count / (b.doc_count || 1)) * 100)
+    }));
+
+    // 3. Compliance Trend: Monthly completion rate for last 6 months
+    const trendRes = await this.elasticsearchService.search({
+      index: 'inspections',
+      body: {
+        size: 0,
+        query: {
+          range: {
+            scheduledDate: {
+              gte: 'now-6M/M',
+              lte: 'now/M'
+            }
+          }
+        },
+        aggs: {
+          months: {
+            date_histogram: {
+              field: 'scheduledDate',
+              calendar_interval: 'month',
+              format: 'MMM'
+            },
+            aggs: {
+              completed: {
+                filter: { term: { status: 'completed' } }
+              }
+            }
+          }
+        }
+      }
+    } as any);
+
+    const trendAggs = (trendRes.aggregations as any)?.months?.buckets || [];
+    const complianceTrendData = trendAggs.map((b: any) => ({
+      month: b.key_as_string,
+      value: Math.round((b.completed.doc_count / (b.doc_count || 1)) * 100)
+    }));
+
+    // 4. Asset Type Distribution
+    const typeDistRes = await this.elasticsearchService.search({
+      index: 'inspections',
+      body: {
+        size: 0,
+        aggs: {
+          types: {
+            terms: { field: 'type', size: 10 }
+          }
+        }
+      }
+    } as any);
+
+    const typeAggs = (typeDistRes.aggregations as any)?.types?.buckets || [];
+    const typeData = typeAggs.map((b: any) => ({
+      type: b.key,
+      value: b.doc_count,
+      percentage: 0
+    }));
+
+    // Calculate percentages and add colors
+    const totalTypes = typeData.reduce((sum: number, item: any) => sum + item.value, 0);
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    typeData.forEach((item: any, index: number) => {
+      item.percentage = totalTypes > 0 ? Math.round((item.value / totalTypes) * 100) : 0;
+      item.color = colors[index % colors.length];
+    });
+
+    return {
+      timeline: timelineData,
+      zoneCoverage: zoneCoverageData,
+      complianceTrend: complianceTrendData,
+      typeDistribution: typeData
+    };
   }
 
   async getReports() {

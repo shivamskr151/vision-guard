@@ -7,6 +7,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { ElasticsearchModule } from '@nestjs/elasticsearch';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { EventsModule } from '../events/events.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
         inject: [ConfigService],
       },
     ]),
+    EventsModule,
   ],
   controllers: [InspectionsController],
   providers: [

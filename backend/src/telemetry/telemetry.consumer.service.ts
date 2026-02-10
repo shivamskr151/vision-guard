@@ -3,6 +3,8 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 
+import { EventsGateway } from '../events/events.gateway';
+
 @Injectable()
 export class TelemetryConsumerService {
     private readonly logger = new Logger(TelemetryConsumerService.name);
@@ -10,6 +12,7 @@ export class TelemetryConsumerService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly elasticsearchService: ElasticsearchService,
+        private readonly eventsGateway: EventsGateway,
     ) { }
 
     async saveTelemetry(data: any) {
@@ -45,6 +48,9 @@ export class TelemetryConsumerService {
                     criticalAssetRiskIndex: savedRecord.criticalAssetRiskIndex,
                 },
             });
+
+            // Emit Real-time Update
+            this.eventsGateway.broadcast('telemetry', savedRecord);
 
         } catch (error) {
             this.logger.error('Error processing telemetry data', error);

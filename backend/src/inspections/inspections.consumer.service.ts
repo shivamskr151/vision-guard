@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
+import { EventsGateway } from '../events/events.gateway';
+import { InspectionsService } from './inspections.service';
 
 @Injectable()
 export class InspectionsConsumerService {
@@ -9,6 +11,8 @@ export class InspectionsConsumerService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly elasticsearchService: ElasticsearchService,
+        private readonly inspectionsService: InspectionsService,
+        private readonly eventsGateway: EventsGateway,
     ) { }
 
     async processInspectionUpdate(data: any) {
@@ -59,12 +63,18 @@ export class InspectionsConsumerService {
                     completedDate: inspection.completedDate,
                     durationSeconds: inspection.durationSeconds,
                     zone: asset.zone,
-                    assetType: asset.type,
+                    type: asset.type,
                     updatedAt: new Date(),
                 },
+                refresh: true,
             } as any);
 
             this.logger.log(`Indexed inspection in Elasticsearch: ID ${inspection.id}`);
+
+            // Fetch updated graph data from ES and broadcast
+            const stats = await this.inspectionsService.getRealtimeGraphsData();
+            this.eventsGateway.broadcast('inspection_stats', stats);
+
         } catch (error) {
             this.logger.error('Error processing inspection update', error);
         }

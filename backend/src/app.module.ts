@@ -8,6 +8,7 @@ import { InspectionsModule } from './inspections/inspections.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { AnomaliesModule } from './anomalies/anomalies.module';
 import { ElasticsearchModule } from '@nestjs/elasticsearch';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ElasticsearchModule } from '@nestjs/elasticsearch';
     InspectionsModule,
     TelemetryModule,
     AnomaliesModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
