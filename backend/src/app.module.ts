@@ -9,6 +9,7 @@ import { TelemetryModule } from './telemetry/telemetry.module';
 import { AnomaliesModule } from './anomalies/anomalies.module';
 import { ElasticsearchModule } from '@nestjs/elasticsearch';
 import { EventsModule } from './events/events.module';
+import { KafkaModule } from './kafka/kafka.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { EventsModule } from './events/events.module';
     TelemetryModule,
     AnomaliesModule,
     EventsModule,
+    KafkaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

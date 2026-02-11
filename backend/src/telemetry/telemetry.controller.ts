@@ -1,18 +1,18 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventPattern, Payload } from '@nestjs/microservices';
-import { TelemetryConsumerService } from './telemetry.consumer.service';
+import { TelemetryService } from './telemetry.service';
 
 @Controller('telemetry')
 export class TelemetryController {
     constructor(
         private readonly prisma: PrismaService,
-        private readonly telemetryConsumerService: TelemetryConsumerService
+        private readonly telemetryService: TelemetryService
     ) { }
 
     @EventPattern('asset_telemetry')
     async handleTelemetry(@Payload() data: any) {
-        await this.telemetryConsumerService.saveTelemetry(data);
+        await this.telemetryService.saveTelemetry(data);
     }
 
     @Get('latest')

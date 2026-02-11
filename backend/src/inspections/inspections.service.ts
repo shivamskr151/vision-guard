@@ -3,18 +3,71 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { CreateInspectionDto } from './dto/create-inspection.dto';
 import { UpdateInspectionDto } from './dto/update-inspection.dto';
+import * as fs from 'fs';
+import * as path from 'path';
+import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
+import { EventPattern, Payload } from '@nestjs/microservices';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class InspectionsService implements OnModuleInit {
+  private readonly logger = new Logger(InspectionsService.name);
+  private inspectionCounter = 10000;
+
   constructor(
     private prisma: PrismaService,
-    private readonly elasticsearchService: ElasticsearchService
+    private readonly elasticsearchService: ElasticsearchService,
+    private readonly kafkaProducerService: KafkaProducerService,
+    private readonly eventsGateway: EventsGateway,
   ) { }
-
-  private readonly logger = new Logger(InspectionsService.name);
 
   async onModuleInit() {
     this.createIndex();
+    this.startInspectionStream();
+  }
+
+  private startInspectionStream() {
+    this.logger.log('Starting Inspection Stream from CSV...');
+    const csvPath = path.join(process.cwd(), 'Data', 'inspection_updates.csv');
+
+    setInterval(async () => {
+      try {
+        if (!fs.existsSync(csvPath)) {
+          this.logger.warn(`CSV file not found at ${csvPath}`);
+          return;
+        }
+
+        const fileContent = fs.readFileSync(csvPath, 'utf-8');
+        const lines = fileContent.split('\n').filter((line) => line.trim() !== '');
+
+        // Skip header, pick random line to simulate continuous updates
+        const randomLine = lines[Math.floor(Math.random() * (lines.length - 1)) + 1];
+        const values = randomLine.split(',');
+
+        // Generate unique inspection ID for real-time creation
+        const uniqueInspectionId = this.inspectionCounter++;
+
+        const payload = {
+          timestamp: new Date().toISOString(),
+          inspectionId: uniqueInspectionId, // Use unique ID instead of CSV ID
+          assetId: values[1],
+          inspectorId: values[2],
+          type: values[3],
+          status: values[4],
+          result: values[5] === 'null' ? null : values[5],
+          scheduledDate: values[6],
+          completedDate: values[7] === 'null' ? null : values[7],
+          durationSeconds: values[8] === 'null' ? null : parseInt(values[8]),
+          defects: parseInt(values[9]),
+          notes: values[10],
+        };
+
+        this.kafkaProducerService.emit('inspection_updates', payload);
+        this.logger.verbose(`Emitted NEW inspection for ${payload.assetId} (ID: ${payload.inspectionId})`);
+      } catch (error) {
+        this.logger.error('Error in inspection stream', error);
+      }
+    }, 8000); // Every 8 seconds
   }
 
   async createIndex() {
@@ -127,6 +180,72 @@ export class InspectionsService implements OnModuleInit {
         type: asset?.type,
       }
     } as any);
+  }
+
+  @EventPattern('inspection_updates')
+  async processInspectionUpdate(@Payload() data: any) {
+    this.logger.log(
+      `Received inspection update: ID ${data.inspectionId} for ${data.assetId}`,
+    );
+
+    try {
+      // Verify asset exists
+      const asset = await this.prisma.asset.findUnique({
+        where: { assetId: data.assetId },
+      });
+
+      if (!asset) {
+        this.logger.warn(`Asset ${data.assetId} not found, skipping inspection update`);
+        return;
+      }
+
+      // Create new inspection in PostgreSQL (always create for real-time updates)
+      const inspection = await this.prisma.inspection.create({
+        data: {
+          assetId: data.assetId,
+          inspectorId: data.inspectorId,
+          type: data.type,
+          status: data.status,
+          result: data.result,
+          scheduledDate: new Date(data.scheduledDate),
+          completedDate: data.completedDate ? new Date(data.completedDate) : null,
+          durationSeconds: data.durationSeconds,
+          defects: data.defects,
+          notes: data.notes,
+        },
+      });
+
+      this.logger.log(`Created NEW inspection in DB: ID ${inspection.id}`);
+
+      // Index to Elasticsearch
+      await this.elasticsearchService.index({
+        index: 'inspections',
+        id: inspection.id.toString(),
+        document: {
+          id: inspection.id,
+          assetId: inspection.assetId,
+          inspectorId: inspection.inspectorId,
+          status: inspection.status,
+          result: inspection.result,
+          scheduledDate: inspection.scheduledDate,
+          completedDate: inspection.completedDate,
+          durationSeconds: inspection.durationSeconds,
+          zone: asset.zone,
+          type: asset.type,
+          updatedAt: new Date(),
+        },
+        refresh: true,
+      } as any);
+
+      this.logger.log(`Indexed inspection in Elasticsearch: ID ${inspection.id}`);
+
+      // Fetch updated graph data from ES and broadcast
+      const stats = await this.getRealtimeGraphsData();
+      this.eventsGateway.broadcast('inspection_stats', stats);
+
+    } catch (error) {
+      this.logger.error('Error processing inspection update', error);
+    }
   }
 
   async getDashboardData() {

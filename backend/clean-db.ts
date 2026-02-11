@@ -51,7 +51,7 @@ async function main() {
 
     // 2. Clean ElasticSearch
     console.log('Cleaning ElasticSearch indices...');
-    const indices = ['anomaly_events', 'inspections', 'traffic_data'];
+    const indices = ['anomaly_events', 'inspections', 'asset_telemetry', 'assets', 'traffic_data'];
 
     for (const index of indices) {
         try {

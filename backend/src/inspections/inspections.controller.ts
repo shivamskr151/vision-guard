@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { InspectionsService } from './inspections.service';
-import { InspectionsConsumerService } from './inspections.consumer.service';
+
 import { CreateInspectionDto } from './dto/create-inspection.dto';
 import { UpdateInspectionDto } from './dto/update-inspection.dto';
 
@@ -9,13 +9,9 @@ import { UpdateInspectionDto } from './dto/update-inspection.dto';
 export class InspectionsController {
   constructor(
     private readonly inspectionsService: InspectionsService,
-    private readonly inspectionsConsumerService: InspectionsConsumerService,
   ) { }
 
-  @EventPattern('inspection_updates')
-  async handleInspectionUpdate(@Payload() data: any) {
-    await this.inspectionsConsumerService.processInspectionUpdate(data);
-  }
+
 
   @Post('seed')
   seed() {

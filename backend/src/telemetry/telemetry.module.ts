@@ -1,15 +1,15 @@
 import { Module } from '@nestjs/common';
-import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ElasticsearchModule } from '@nestjs/elasticsearch';
 import { TelemetryController } from './telemetry.controller';
-import { TelemetryProducerService } from './telemetry.producer.service';
-import { TelemetryConsumerService } from './telemetry.consumer.service';
+import { TelemetryService } from './telemetry.service';
+import { EventsModule } from '../events/events.module';
 
 @Module({
     imports: [
         PrismaModule,
+        EventsModule,
         ElasticsearchModule.registerAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({
@@ -17,27 +17,9 @@ import { TelemetryConsumerService } from './telemetry.consumer.service';
             }),
             inject: [ConfigService],
         }),
-        ClientsModule.registerAsync([
-            {
-                name: 'TELEMETRY_SERVICE',
-                imports: [ConfigModule],
-                useFactory: async (configService: ConfigService) => ({
-                    transport: Transport.KAFKA,
-                    options: {
-                        client: {
-                            clientId: 'telemetry',
-                            brokers: (configService.get<string>('KAFKA_BROKERS') ?? 'localhost:9092').split(','),
-                        },
-                        consumer: {
-                            groupId: 'telemetry-consumer',
-                        },
-                    },
-                }),
-                inject: [ConfigService],
-            },
-        ]),
+
     ],
     controllers: [TelemetryController],
-    providers: [TelemetryProducerService, TelemetryConsumerService],
+    providers: [TelemetryService],
 })
 export class TelemetryModule { }
