@@ -71,6 +71,29 @@ export class TelemetryService implements OnModuleInit {
 
     async saveTelemetry(data: any) {
         try {
+            // Check if asset exists, if not create placeholder
+            let asset = await this.prisma.asset.findUnique({
+                where: { assetId: data.assetId },
+            });
+
+            if (!asset) {
+                this.logger.warn(`Asset ${data.assetId} not found, creating placeholder...`);
+                // Create minimal placeholder asset
+                asset = await this.prisma.asset.create({
+                    data: {
+                        assetId: data.assetId,
+                        name: `Unknown Asset ${data.assetId}`,
+                        type: 'Unknown',
+                        zone: 'Unknown',
+                        healthStatus: 'unknown',
+                        criticality: 5,
+                        criticalityMax: 10,
+                        x: 0,
+                        y: 0
+                    }
+                });
+            }
+
             // Save to PostgreSQL
             const savedRecord = await this.prisma.assetTelemetry.create({
                 data: {

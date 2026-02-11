@@ -22,10 +22,7 @@ export class AssetsController {
         return this.assetsService.findAll();
     }
 
-    @Post('seed')
-    seed() {
-        return this.assetsService.seed();
-    }
+
 
     @Get('schemas')
     getSchemas() {

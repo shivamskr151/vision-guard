@@ -11,12 +11,12 @@ export class InspectionsController {
     private readonly inspectionsService: InspectionsService,
   ) { }
 
-
-
-  @Post('seed')
-  seed() {
-    return this.inspectionsService.seed();
+  @EventPattern('inspection_updates')
+  async handleInspectionUpdate(@Payload() data: any) {
+    await this.inspectionsService.processInspectionUpdate(data);
   }
+
+
 
   @Post('sync')
   sync() {

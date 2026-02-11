@@ -94,76 +94,6 @@ export class InspectionsService implements OnModuleInit {
     }
   }
 
-  async seed() {
-    const count = await this.prisma.inspection.count();
-    if (count > 0) return { message: 'Inspections already seeded' };
-
-    const assets = await this.prisma.asset.findMany();
-    if (assets.length === 0) return { message: 'No assets found to seed inspections' };
-
-    const statuses = ['scheduled', 'in-progress', 'completed', 'overdue', 'missed'];
-    const results = ['pass', 'fail', 'warning'];
-
-    const inspections: any[] = [];
-
-    // Past inspections
-    for (let i = 0; i < 50; i++) {
-      const asset = assets[Math.floor(Math.random() * assets.length)];
-      const isCompleted = Math.random() > 0.3;
-      const status = isCompleted ? 'completed' : (Math.random() > 0.5 ? 'overdue' : 'missed');
-      const result = isCompleted ? results[Math.floor(Math.random() * results.length)] : null;
-      const scheduledDate = new Date();
-      scheduledDate.setDate(scheduledDate.getDate() - Math.floor(Math.random() * 60)); // Past 60 days
-
-      let completedDate: Date | null = null;
-      let durationSeconds: number | null = null;
-
-      if (isCompleted) {
-        const date = new Date(scheduledDate);
-        date.setDate(date.getDate() + Math.random() * 2);
-        completedDate = date;
-        durationSeconds = Math.floor(Math.random() * 3600) + 600;
-      }
-
-      inspections.push({
-        assetId: asset.assetId,
-        status,
-        result,
-        scheduledDate,
-        completedDate,
-        durationSeconds,
-        checklistData: {} as any
-      });
-    }
-
-    // Future/Upcoming inspections
-    for (let i = 0; i < 20; i++) {
-      const asset = assets[Math.floor(Math.random() * assets.length)];
-      const scheduledDate = new Date();
-      scheduledDate.setDate(scheduledDate.getDate() + Math.floor(Math.random() * 30)); // Next 30 days
-
-      inspections.push({
-        assetId: asset.assetId,
-        status: 'scheduled',
-        result: null,
-        scheduledDate,
-        completedDate: null,
-        durationSeconds: null,
-        checklistData: {} as any
-      });
-    }
-
-    for (const data of inspections) {
-      const inspection = await this.prisma.inspection.create({ data });
-      // Fetch asset details for ES content
-      const asset = assets.find(a => a.assetId === data.assetId);
-      await this.indexInspection(inspection, asset);
-    }
-
-    return { message: `Seeded ${inspections.length} inspections` };
-  }
-
-
   async indexInspection(inspection: any, asset: any) {
     return this.elasticsearchService.index({
       index: 'inspections',
@@ -190,13 +120,25 @@ export class InspectionsService implements OnModuleInit {
 
     try {
       // Verify asset exists
-      const asset = await this.prisma.asset.findUnique({
+      let asset = await this.prisma.asset.findUnique({
         where: { assetId: data.assetId },
       });
 
       if (!asset) {
-        this.logger.warn(`Asset ${data.assetId} not found, skipping inspection update`);
-        return;
+        this.logger.warn(`Asset ${data.assetId} not found, creating placeholder...`);
+        asset = await this.prisma.asset.create({
+          data: {
+            assetId: data.assetId,
+            name: `Unknown Asset ${data.assetId}`,
+            type: 'Unknown',
+            zone: 'Unknown',
+            healthStatus: 'unknown',
+            criticality: 5,
+            criticalityMax: 10,
+            x: 0,
+            y: 0
+          }
+        });
       }
 
       // Create new inspection in PostgreSQL (always create for real-time updates)
@@ -600,12 +542,18 @@ export class InspectionsService implements OnModuleInit {
     return newInspection;
   }
 
-  findAll() {
-    return `This action returns all inspections`;
+  async findAll() {
+    return this.prisma.inspection.findMany({
+      include: { asset: true },
+      orderBy: { scheduledDate: 'desc' }
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} inspection`;
+  async findOne(id: number) {
+    return this.prisma.inspection.findUnique({
+      where: { id },
+      include: { asset: true }
+    });
   }
 
   async update(id: number, updateInspectionDto: UpdateInspectionDto) {
@@ -640,7 +588,14 @@ export class InspectionsService implements OnModuleInit {
     return { message: `Synced ${inspections.length} inspections` };
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} inspection`;
+  async remove(id: number) {
+    const inspection = await this.prisma.inspection.findUnique({ where: { id } });
+    if (inspection) {
+      await this.elasticsearchService.delete({
+        index: 'inspections',
+        id: id.toString()
+      });
+    }
+    return this.prisma.inspection.delete({ where: { id } });
   }
 }
