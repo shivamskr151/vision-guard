@@ -553,31 +553,70 @@ export class InspectionsService implements OnModuleInit {
     };
   }
 
-  async getReports() {
-    const reports = await this.prisma.inspection.findMany({
-      where: {
-        status: { in: ['completed', 'overdue', 'missed'] } // Only historical/finalized statuses
-      },
-      include: {
-        asset: true
-      },
-      orderBy: {
-        completedDate: 'desc'
-      }
-    });
+  async getReports(page: number = 1, limit: number = 10, status?: string) {
+    const skip = (page - 1) * limit;
 
-    return reports.map((i: any) => ({
+    // Base filter for historically relevant inspections
+    const where: any = {
+      status: { in: ['completed', 'overdue', 'missed'] }
+    };
+
+    // Apply status filter based on UI mapping logic
+    if (status && status !== 'all') {
+      if (status === 'pass') {
+        where.status = 'completed';
+        where.result = 'pass';
+      } else if (status === 'fail') {
+        // Fail includes failed inspections AND overdue/missed items
+        where.OR = [
+          { status: 'completed', result: 'fail' },
+          { status: 'overdue' },
+          { status: 'missed' }
+        ];
+        delete where.status; // Remove base status filter as OR handles it
+      } else if (status === 'partial') {
+        where.status = 'completed';
+        where.result = { notIn: ['pass', 'fail'] };
+      }
+    }
+
+    const [reports, total] = await Promise.all([
+      this.prisma.inspection.findMany({
+        where,
+        include: {
+          asset: true
+        },
+        orderBy: {
+          completedDate: 'desc'
+        },
+        skip,
+        take: limit
+      }),
+      this.prisma.inspection.count({
+        where
+      })
+    ]);
+
+    const data = reports.map((i: any) => ({
       id: i.id,
       assetName: i.asset.name,
       inspectionDate: i.completedDate ? i.completedDate.toISOString().split('T')[0] : i.scheduledDate.toISOString().split('T')[0],
       inspectionType: 'Routine', // Placeholder or derive from asset type/template
       status: i.status === 'completed'
         ? (i.result === 'pass' ? 'pass' : i.result === 'fail' ? 'fail' : 'partial')
-        : 'fail', // Map overdue/missed to fail for reports view or keep status? The UI expects pass/fail/partial. Let's map overdue to fail.
+        : 'fail',
       defects: i.result === 'fail' ? i.defects : 0,
       inspector: 'Vision System AI',
       duration: i.durationSeconds ? `${Math.floor(i.durationSeconds / 60)} min` : '-'
     }));
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   async create(createInspectionDto: CreateInspectionDto) {

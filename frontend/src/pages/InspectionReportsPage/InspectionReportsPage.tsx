@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   STATUS_FILTER_OPTIONS,
 } from '@/data/inspectionConstants'
@@ -79,14 +79,19 @@ export function InspectionReportsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [reports, setReports] = useState<InspectionReportRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const LIMIT = 10
 
   useEffect(() => {
     const fetchReports = async () => {
+      setLoading(true)
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/inspections/reports`)
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/inspections/reports?page=${currentPage}&limit=${LIMIT}&status=${statusFilter}`)
         if (res.ok) {
-          const data = await res.json()
-          setReports(data)
+          const result = await res.json()
+          setReports(result.data || [])
+          setTotalPages(result.totalPages || 1)
         }
       } catch (error) {
         console.error('Error fetching reports:', error)
@@ -96,16 +101,11 @@ export function InspectionReportsPage() {
     }
 
     fetchReports()
-  }, [])
+  }, [currentPage, statusFilter])
 
-  const filteredReports = useMemo(() => {
-    if (statusFilter === 'all') return reports
-    return reports.filter((r) => r.status === statusFilter)
-  }, [statusFilter, reports])
 
-  if (loading && reports.length === 0) {
-    return <div className={styles.page} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Loading reports...</div>
-  }
+  // Backend handles filtering now
+  const filteredReports = reports
 
   const handleExport = () => {
     if (filteredReports.length === 0) {
@@ -123,7 +123,7 @@ export function InspectionReportsPage() {
         report.inspectionDate,
         report.inspectionType,
         report.status,
-        report.defects || 'None',
+        String(report.defects || 'None'),
         report.inspector,
         String(report.duration),
       ])
@@ -162,7 +162,10 @@ export function InspectionReportsPage() {
         <select
           className={styles.filterSelect}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => {
+            setStatusFilter(e.target.value)
+            setCurrentPage(1)
+          }}
           aria-label="Filter reports by status"
         >
           {STATUS_FILTER_OPTIONS.map((opt) => (
@@ -188,36 +191,39 @@ export function InspectionReportsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredReports.map((row) => (
-              <tr key={row.id}>
-                <td>{row.assetName}</td>
-                <td>{row.inspectionDate}</td>
-                <td>{row.inspectionType}</td>
-                <td>
-                  <StatusBadge status={row.status} />
-                </td>
-                <td
-                  className={
-                    row.status === 'fail'
-                      ? styles.defectsFail
-                      : row.status === 'partial'
-                        ? styles.defectsPartial
-                        : undefined
-                  }
-                >
-                  {row.defects}
-                </td>
-                <td>{row.inspector}</td>
-                <td>{row.duration}</td>
-                <td>
-                  <button type="button" className={styles.viewReportBtn} onClick={() => alert(`Viewing report for ${row.assetName}`)}>
-                    <IconEye size={16} />
-                    View Report
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {filteredReports.length === 0 && (
+            {loading ? (
+              <tr><td colSpan={8} style={{ textAlign: 'center', padding: '20px' }}>Loading...</td></tr>
+            ) : filteredReports.length > 0 ? (
+              filteredReports.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.assetName}</td>
+                  <td>{row.inspectionDate}</td>
+                  <td>{row.inspectionType}</td>
+                  <td>
+                    <StatusBadge status={row.status} />
+                  </td>
+                  <td
+                    className={
+                      row.status === 'fail'
+                        ? styles.defectsFail
+                        : row.status === 'partial'
+                          ? styles.defectsPartial
+                          : undefined
+                    }
+                  >
+                    {row.defects}
+                  </td>
+                  <td>{row.inspector}</td>
+                  <td>{row.duration}</td>
+                  <td>
+                    <button type="button" className={styles.viewReportBtn} onClick={() => alert(`Viewing report for ${row.assetName}`)}>
+                      <IconEye size={16} />
+                      View Report
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
               <tr>
                 <td colSpan={8} style={{ textAlign: 'center', padding: '20px', color: '#6b7280' }}>No reports found.</td>
               </tr>
@@ -225,6 +231,26 @@ export function InspectionReportsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem', paddingBottom: '2rem' }}>
+        <button
+          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+          disabled={currentPage === 1 || loading}
+          style={{ padding: '0.5rem 1rem', background: '#374151', color: 'white', border: 'none', borderRadius: '4px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1 }}
+        >
+          Previous
+        </button>
+        <span style={{ color: '#fff' }}>Page {currentPage} of {totalPages}</span>
+        <button
+          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+          disabled={currentPage === totalPages || loading}
+          style={{ padding: '0.5rem 1rem', background: '#374151', color: 'white', border: 'none', borderRadius: '4px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1 }}
+        >
+          Next
+        </button>
+      </div>
+
     </div>
   )
 }

@@ -34,8 +34,12 @@ export class InspectionsController {
   }
 
   @Get('reports')
-  getReports() {
-    return this.inspectionsService.getReports();
+  getReports(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('status') status?: string,
+  ) {
+    return this.inspectionsService.getReports(Number(page), Number(limit), status);
   }
 
   @Post()
