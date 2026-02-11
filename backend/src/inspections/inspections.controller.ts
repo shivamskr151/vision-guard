@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { InspectionsService } from './inspections.service';
 
@@ -24,8 +24,8 @@ export class InspectionsController {
   }
 
   @Get('dashboard')
-  getDashboardData() {
-    return this.inspectionsService.getDashboardData();
+  getDashboardData(@Query('range') range: string) {
+    return this.inspectionsService.getDashboardData(range);
   }
 
   @Get('upcoming')

@@ -55,8 +55,8 @@ export class InspectionsService implements OnModuleInit {
           type: values[3],
           status: values[4],
           result: values[5] === 'null' ? null : values[5],
-          scheduledDate: values[6],
-          completedDate: values[7] === 'null' ? null : values[7],
+          scheduledDate: new Date().toISOString(), // Use current time
+          completedDate: values[7] === 'null' ? null : new Date().toISOString(), // Use current time if completed
           durationSeconds: values[8] === 'null' ? null : parseInt(values[8]),
           defects: parseInt(values[9]),
           notes: values[10],
@@ -67,7 +67,7 @@ export class InspectionsService implements OnModuleInit {
       } catch (error) {
         this.logger.error('Error in inspection stream', error);
       }
-    }, 8000); // Every 8 seconds
+    }, 3000); // Every 3 seconds
   }
 
   async createIndex() {
@@ -190,7 +190,19 @@ export class InspectionsService implements OnModuleInit {
     }
   }
 
-  async getDashboardData() {
+  async getDashboardData(range: string = 'week') {
+    // Determine date range for filtering
+    const now = new Date();
+    let startDate = new Date();
+
+    if (range === 'live') {
+      startDate.setHours(now.getHours() - 1); // Last 1 hour
+    } else if (range === 'today') {
+      startDate.setHours(0, 0, 0, 0); // Start of today
+    } else {
+      startDate.setDate(now.getDate() - 7); // Last 7 days
+    }
+
     const dueCount = await this.prisma.inspection.count({
       where: {
         status: 'scheduled',
@@ -202,29 +214,27 @@ export class InspectionsService implements OnModuleInit {
 
     const overdueCount = await this.prisma.inspection.count({ where: { status: 'overdue' } });
 
-    // This month compliance
-    const startOfMonth = new Date();
-    startOfMonth.setDate(startOfMonth.getDate() - 30);
-
-    const completedLast30 = await this.prisma.inspection.count({
+    // Completed in range
+    const completedInRange = await this.prisma.inspection.count({
       where: {
         status: 'completed',
-        completedDate: { gte: startOfMonth }
+        completedDate: { gte: startDate }
       }
     });
 
-    const totalLast30 = await this.prisma.inspection.count({
+    const totalInRange = await this.prisma.inspection.count({
       where: {
-        scheduledDate: { gte: startOfMonth, lte: new Date() }
+        scheduledDate: { gte: startDate, lte: now }
       }
     });
 
-
-
-    // Average Duration
+    // Average Duration (in range)
     const avgDurationAgg = await this.prisma.inspection.aggregate({
       _avg: { durationSeconds: true },
-      where: { status: 'completed' }
+      where: {
+        status: 'completed',
+        completedDate: { gte: startDate }
+      }
     });
     const avgDuration = Math.round(avgDurationAgg._avg.durationSeconds || 0);
 
@@ -297,11 +307,11 @@ export class InspectionsService implements OnModuleInit {
     const rawRisk = (activeAnomaliesCount * 1.5) + (overdueCount * 2.5);
     const riskIndex = parseFloat(Math.min(100, rawRisk).toFixed(1));
 
-    // Recent Compliance (SLA) - Last 30 days
-    const slaCompliance = totalLast30 > 0 ? ((completedLast30 / totalLast30) * 100).toFixed(1) : '100.0';
+    // SLA Compliance (in range)
+    const slaCompliance = totalInRange > 0 ? ((completedInRange / totalInRange) * 100).toFixed(1) : '100.0';
 
-    // Fetch Graph Data from Elasticsearch (Centralized method)
-    const graphData = await this.getRealtimeGraphsData();
+    // Fetch Graph Data from Elasticsearch (Centralized method) with range
+    const graphData = await this.getRealtimeGraphsData(range);
 
     return {
       kpi: {
@@ -309,7 +319,7 @@ export class InspectionsService implements OnModuleInit {
         due: dueCount,
         overdue: overdueCount,
         activeAnomalies: activeAnomaliesCount,
-        completed: completedLast30,
+        completed: completedInRange,
         sla: slaCompliance,
         riskIndex,
         averageDuration: avgDuration
@@ -365,8 +375,37 @@ export class InspectionsService implements OnModuleInit {
     });
   }
 
-  async getRealtimeGraphsData() {
-    // 1. Timeline: Inspections scheduled per day for next 30 days
+  async getRealtimeGraphsData(range: string = 'week') {
+    let gte = 'now-7d';
+    let lte = 'now';
+    let interval = 'day';
+    let isFixed = false;
+
+    if (range === 'live') {
+      gte = 'now-1h';
+      interval = '5m';
+      isFixed = true;
+    } else if (range === 'today') {
+      gte = 'now/d'; // Start of today
+      interval = 'hour';
+      isFixed = false;
+    } else if (range === 'week') {
+      gte = 'now-7d';
+      interval = 'day';
+      isFixed = false;
+    }
+
+    const dateHistogram: any = {
+      field: 'scheduledDate',
+    };
+
+    if (isFixed) {
+      dateHistogram.fixed_interval = interval;
+    } else {
+      dateHistogram.calendar_interval = interval;
+    }
+
+    // 1. Timeline: Inspections scheduled per day/interval
     const timelineRes = await this.elasticsearchService.search({
       index: 'inspections',
       body: {
@@ -374,17 +413,14 @@ export class InspectionsService implements OnModuleInit {
         query: {
           range: {
             scheduledDate: {
-              gte: 'now-30d',
-              lte: 'now+30d'
+              gte,
+              lte
             }
           }
         },
         aggs: {
           inspections_over_time: {
-            date_histogram: {
-              field: 'scheduledDate',
-              calendar_interval: 'day'
-            }
+            date_histogram: dateHistogram
           }
         }
       }
@@ -392,21 +428,28 @@ export class InspectionsService implements OnModuleInit {
 
     const timelineAggs = (timelineRes.aggregations as any)?.inspections_over_time?.buckets || [];
     const timelineData = timelineAggs.map((b: any) => ({
-      label: new Date(b.key_as_string).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      label: range === 'week'
+        ? new Date(b.key_as_string).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+        : new Date(b.key_as_string).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
       count: b.doc_count
     }));
 
-    // 2. Zone Coverage: % Completed / Total per Zone
+    // 2. Zone Coverage: % Completed / Total per Zone (filtered by range)
     const zoneCoverageRes = await this.elasticsearchService.search({
       index: 'inspections',
       body: {
         size: 0,
+        query: { // Add filtering for zone coverage
+          range: {
+            scheduledDate: { gte, lte }
+          }
+        },
         aggs: {
           zones: {
             terms: { field: 'zone', size: 20 },
             aggs: {
               completed: {
-                filter: { term: { status: 'completed' } }
+                filter: { term: { 'status': 'completed' } }
               }
             }
           }
@@ -420,7 +463,22 @@ export class InspectionsService implements OnModuleInit {
       percentage: Math.round((b.completed.doc_count / (b.doc_count || 1)) * 100)
     }));
 
-    // 3. Compliance Trend: Monthly completion rate for last 6 months
+    // 3. Compliance Trend: Monthly? No, adapt to range
+    // If range is live/today, trend might be meaningless or hourly
+    const trendConfig: any = {
+      gte: 'now-6M/M',
+      lte: 'now/M',
+      interval: 'month'
+    };
+
+    if (range === 'live' || range === 'today') {
+      trendConfig.gte = 'now-24h';
+      trendConfig.interval = 'hour';
+    } else if (range === 'week') {
+      trendConfig.gte = 'now-7d';
+      trendConfig.interval = 'day';
+    }
+
     const trendRes = await this.elasticsearchService.search({
       index: 'inspections',
       body: {
@@ -428,8 +486,8 @@ export class InspectionsService implements OnModuleInit {
         query: {
           range: {
             scheduledDate: {
-              gte: 'now-6M/M',
-              lte: 'now/M'
+              gte: trendConfig.gte,
+              lte: trendConfig.lte
             }
           }
         },
@@ -437,8 +495,8 @@ export class InspectionsService implements OnModuleInit {
           months: {
             date_histogram: {
               field: 'scheduledDate',
-              calendar_interval: 'month',
-              format: 'MMM'
+              calendar_interval: trendConfig.interval,
+              format: range === 'week' ? 'dd MMM' : (range === 'live' ? 'HH:mm' : 'MMM')
             },
             aggs: {
               completed: {
@@ -456,11 +514,14 @@ export class InspectionsService implements OnModuleInit {
       value: Math.round((b.completed.doc_count / (b.doc_count || 1)) * 100)
     }));
 
-    // 4. Asset Type Distribution
+    // 4. Asset Type Distribution (in range)
     const typeDistRes = await this.elasticsearchService.search({
       index: 'inspections',
       body: {
         size: 0,
+        query: {
+          range: { scheduledDate: { gte, lte } }
+        },
         aggs: {
           types: {
             terms: { field: 'type', size: 10 }

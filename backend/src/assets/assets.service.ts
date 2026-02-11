@@ -23,42 +23,58 @@ export class AssetsService implements OnModuleInit {
         this.logger.log('Starting Asset Stream from CSV...');
         const csvPath = path.join(process.cwd(), 'Data', 'asset_updates.csv');
 
+        if (!fs.existsSync(csvPath)) {
+            this.logger.warn(`CSV file not found at ${csvPath}`);
+            return;
+        }
+
+        const fileContent = fs.readFileSync(csvPath, 'utf-8');
+        const lines = fileContent.split('\n').filter((line) => line.trim() !== '');
+
+        // Initial burst: Emit all unique assets to populate DB quickly
+        const uniqueAssets = new Set();
+        lines.slice(1).forEach(line => { // Skip header
+            const values = line.split(',');
+            const assetId = values[0];
+            if (!uniqueAssets.has(assetId)) {
+                uniqueAssets.add(assetId);
+                this.emitAssetUpdate(values);
+            }
+        });
+
+        this.logger.log(`Emitted initial burst of ${uniqueAssets.size} assets.`);
+
         setInterval(async () => {
             try {
-                if (!fs.existsSync(csvPath)) {
-                    this.logger.warn(`CSV file not found at ${csvPath}`);
-                    return;
-                }
-
-                const fileContent = fs.readFileSync(csvPath, 'utf-8');
-                const lines = fileContent.split('\n').filter((line) => line.trim() !== '');
-
                 // Skip header, pick random line to simulate continuous updates
                 const randomLine = lines[Math.floor(Math.random() * (lines.length - 1)) + 1];
                 const values = randomLine.split(',');
-
-                const payload = {
-                    timestamp: new Date().toISOString(),
-                    assetId: values[0],
-                    name: values[1],
-                    type: values[2],
-                    zone: values[3],
-                    healthStatus: values[4],
-                    linkedCameras: parseInt(values[5]),
-                    criticality: parseInt(values[6]),
-                    criticalityMax: parseInt(values[7]),
-                    x: parseFloat(values[8]),
-                    y: parseFloat(values[9]),
-                    lastInspectionDate: values[10],
-                    inspectionFrequency: parseInt(values[11]),
-                };
-
-                this.kafkaProducerService.emit('asset_updates', payload);
-                this.logger.verbose(`Emitted asset update for ${payload.assetId}`);
+                this.emitAssetUpdate(values);
             } catch (error) {
                 this.logger.error('Error in asset stream', error);
             }
-        }, 5000); // Every 5 seconds
+        }, 3000); // Every 3 seconds
+    }
+
+    private emitAssetUpdate(values: string[]) {
+        const payload = {
+            timestamp: new Date().toISOString(),
+            assetId: values[0],
+            name: values[1],
+            type: values[2],
+            zone: values[3],
+            healthStatus: values[4],
+            linkedCameras: parseInt(values[5]),
+            criticality: parseInt(values[6]),
+            criticalityMax: parseInt(values[7]),
+            x: parseFloat(values[8]),
+            y: parseFloat(values[9]),
+            lastInspectionDate: values[10],
+            inspectionFrequency: parseInt(values[11]),
+        };
+
+        this.kafkaProducerService.emit('asset_updates', payload);
+        this.logger.verbose(`Emitted asset update for ${payload.assetId}`);
     }
 
     async create(data: Prisma.AssetCreateInput) {
