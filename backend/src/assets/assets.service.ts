@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
+import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -12,16 +13,53 @@ export class AssetsService implements OnModuleInit {
     constructor(
         private prisma: PrismaService,
         private elasticsearchService: ElasticsearchService,
-        private kafkaProducerService: KafkaProducerService
+        private kafkaProducerService: KafkaProducerService,
+        private configService: ConfigService
     ) { }
 
     async onModuleInit() {
+        this.startZoneStream();
         this.startAssetStream();
+    }
+
+    private startZoneStream() {
+        this.logger.log('Starting Zone Stream from CSV...');
+        const dataDir: string = this.configService.get<string>('DATA_DIR') || 'Data';
+        const fileName: string = this.configService.get<string>('ZONE_UPDATES_FILE') || 'zone_updates.csv';
+        const csvPath = path.join(process.cwd(), dataDir, fileName);
+
+        if (!fs.existsSync(csvPath)) {
+            this.logger.warn(`CSV file not found at ${csvPath}`);
+            return;
+        }
+
+        const fileContent = fs.readFileSync(csvPath, 'utf-8');
+        const lines = fileContent.split('\n').filter((line) => line.trim() !== '');
+
+        // Emit all zones on startup
+        lines.slice(1).forEach(line => { // Skip header
+            const values = line.split(',');
+            if (values.length >= 6) {
+                const payload = {
+                    timestamp: new Date().toISOString(),
+                    zoneId: values[0],
+                    label: values[1],
+                    x: parseFloat(values[2]),
+                    y: parseFloat(values[3]),
+                    width: parseFloat(values[4]),
+                    height: parseFloat(values[5]),
+                };
+                this.kafkaProducerService.emit('zone_updates', payload);
+                this.logger.verbose(`Emitted zone update for ${payload.zoneId}`);
+            }
+        });
     }
 
     private startAssetStream() {
         this.logger.log('Starting Asset Stream from CSV...');
-        const csvPath = path.join(process.cwd(), 'Data', 'asset_updates.csv');
+        const dataDir: string = this.configService.get<string>('DATA_DIR') || 'Data';
+        const fileName: string = this.configService.get<string>('ASSET_UPDATES_FILE') || 'asset_updates.csv';
+        const csvPath = path.join(process.cwd(), dataDir, fileName);
 
         if (!fs.existsSync(csvPath)) {
             this.logger.warn(`CSV file not found at ${csvPath}`);
@@ -44,6 +82,7 @@ export class AssetsService implements OnModuleInit {
 
         this.logger.log(`Emitted initial burst of ${uniqueAssets.size} assets.`);
 
+        const intervalMs = parseInt(this.configService.get<string>('ASSET_STREAM_INTERVAL') || '3000');
         setInterval(async () => {
             try {
                 // Skip header, pick random line to simulate continuous updates
@@ -53,7 +92,7 @@ export class AssetsService implements OnModuleInit {
             } catch (error) {
                 this.logger.error('Error in asset stream', error);
             }
-        }, 3000); // Every 3 seconds
+        }, intervalMs);
     }
 
     private emitAssetUpdate(values: string[]) {
@@ -136,6 +175,34 @@ export class AssetsService implements OnModuleInit {
             data: updateData,
             include: { assignedTemplates: true } as any
         });
+    }
+
+    async updateZone(data: any) {
+        try {
+            const zone = await (this.prisma as any).zone.upsert({
+                where: { zoneId: data.zoneId },
+                update: {
+                    label: data.label,
+                    x: data.x,
+                    y: data.y,
+                    width: data.width,
+                    height: data.height,
+                    updatedAt: new Date(data.timestamp || new Date())
+                },
+                create: {
+                    zoneId: data.zoneId,
+                    label: data.label,
+                    x: data.x,
+                    y: data.y,
+                    width: data.width,
+                    height: data.height,
+                    updatedAt: new Date(data.timestamp || new Date())
+                }
+            });
+            this.logger.log(`Updated zone in DB: ${zone.zoneId}`);
+        } catch (error) {
+            this.logger.error(`Failed to update zone ${data.zoneId}:`, error);
+        }
     }
 
     async updateAssetStatus(data: any) {

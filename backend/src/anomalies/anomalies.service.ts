@@ -3,6 +3,7 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
+import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -17,6 +18,7 @@ export class AnomaliesService implements OnModuleInit {
         private readonly elasticsearchService: ElasticsearchService,
         private readonly eventsGateway: EventsGateway,
         private readonly kafkaProducerService: KafkaProducerService,
+        private readonly configService: ConfigService
     ) { }
 
     async onModuleInit() {
@@ -25,7 +27,10 @@ export class AnomaliesService implements OnModuleInit {
 
     private startSimulation() {
         this.logger.log('Starting Anomaly Simulation from CSV...');
-        const csvPath = path.join(process.cwd(), 'Data', 'anomaly_data.csv');
+        const dataDir: string = this.configService.get<string>('DATA_DIR') || 'Data';
+        const fileName: string = this.configService.get<string>('ANOMALY_DATA_FILE') || 'anomaly_data.csv';
+        const csvPath = path.join(process.cwd(), dataDir, fileName);
+        const intervalMs = parseInt(this.configService.get<string>('ANOMALY_STREAM_INTERVAL') || '10000');
 
         setInterval(async () => {
             try {
@@ -64,7 +69,7 @@ export class AnomaliesService implements OnModuleInit {
             } catch (error) {
                 this.logger.error('Error in simulation loop', error);
             }
-        }, 10000); // Every 10 seconds
+        }, intervalMs);
     }
 
     @EventPattern('anomaly_events')
@@ -132,5 +137,50 @@ export class AnomaliesService implements OnModuleInit {
         } catch (error) {
             this.logger.error('Error processing anomaly data', error);
         }
+    }
+    async getMapData() {
+        // 1. Fetch Zones from DB
+        const zones = await (this.prisma as any).zone.findMany();
+
+        // 2. Fetch Anomalies from ES
+        const result = await this.elasticsearchService.search({
+            index: 'anomaly_events',
+            size: 100,
+        });
+        const hits = result.hits.hits as any[];
+
+        // 3. Create dynamic region map (Label -> ZoneId)
+        const regionMap: Record<string, string> = {};
+        zones.forEach((z: any) => {
+            regionMap[z.label] = z.zoneId;
+        });
+
+        // 4. Map markers
+        const markers = hits.map((hit: any, index: number) => {
+            const source = hit._source;
+            // Default to first zone if not found, or handle gracefully
+            const regionId = regionMap[source.location] || (zones[0]?.zoneId || 'unknown');
+
+            return {
+                id: `am-${source.id}`,
+                regionId,
+                x: 20 + (index * 10), // scatter them
+                y: 20 + (index * 5),
+                type: source.severity === 'critical' ? 'hotspot' : 'camera',
+                hotspotIcon: source.severity === 'critical' ? 'warning' : undefined,
+            };
+        });
+
+        // 5. Format regions
+        const regions = zones.map((z: any) => ({
+            id: z.zoneId,
+            label: z.label,
+            x: z.x,
+            y: z.y,
+            width: z.width,
+            height: z.height
+        }));
+
+        return { regions, markers };
     }
 }

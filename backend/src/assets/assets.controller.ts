@@ -12,6 +12,11 @@ export class AssetsController {
         await this.assetsService.updateAssetStatus(data);
     }
 
+    @EventPattern('zone_updates')
+    async handleZoneUpdates(@Payload() data: any) {
+        await this.assetsService.updateZone(data);
+    }
+
     @Post()
     create(@Body() createAssetDto: Prisma.AssetCreateInput) {
         return this.assetsService.create(createAssetDto);

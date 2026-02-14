@@ -2,70 +2,116 @@ version: '3.8'
 
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.3.0
+    image: ${ZOOKEEPER_IMAGE}
     container_name: zookeeper
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT}
+      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
     ports:
-      - "2181:2181"
+      - "${ZOOKEEPER_EXTERNAL_PORT}:${ZOOKEEPER_CLIENT_PORT}"
+    networks:
+      - default_net
 
   kafka:
-    image: confluentinc/cp-kafka:7.3.0
+    image: ${KAFKA_IMAGE}
     container_name: kafka
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"
+      - "${KAFKA_EXTERNAL_PORT}:${KAFKA_EXTERNAL_PORT}"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID}
+      KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
+      KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
+      KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME}
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
+    networks:
+      - default_net
 
   postgres:
-    image: postgres:15
+    image: ${POSTGRES_IMAGE}
     container_name: postgres
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: vision_guard
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_EXTERNAL_PORT}:${POSTGRES_INTERNAL_PORT}"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_VOLUME}:/var/lib/postgresql/data
+    networks:
+      - default_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    image: ${ELASTICSEARCH_IMAGE}
     container_name: elasticsearch
     environment:
-      - node.name=elasticsearch
-      - cluster.name=es-docker-cluster
-      - discovery.type=single-node
+      - node.name=${ELASTICSEARCH_NODE_NAME}
+      - cluster.name=${ELASTICSEARCH_CLUSTER_NAME}
+      - discovery.type=${ELASTICSEARCH_DISCOVERY_TYPE}
       - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "ES_JAVA_OPTS=${ELASTICSEARCH_JAVA_OPTS}"
     ulimits:
       memlock:
         soft: -1
         hard: -1
     ports:
-      - "9200:9200"
+      - "${ELASTICSEARCH_EXTERNAL_PORT}:9200"
     volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
+      - ${ELASTICSEARCH_DATA_VOLUME}:/usr/share/elasticsearch/data
+    networks:
+      - default_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
-  kibana:
-    image: docker.elastic.co/kibana/kibana:7.17.10
-    container_name: kibana
-    ports:
-      - "5601:5601"
-    environment:
-      ELASTICSEARCH_URL: http://elasticsearch:9200
-      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+  backend:
+    build: ${BACKEND_BUILD_CONTEXT}
+    container_name: backend
     depends_on:
-      - elasticsearch
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      PORT: ${BACKEND_PORT}
+      KAFKA_BROKER_ID: 1 
+      KAFKA_BROKERS: ${BACKEND_KAFKA_BROKERS}
+      ELASTICSEARCH_NODE: ${BACKEND_ELASTICSEARCH_NODE}
+      # Construct DB URL from other env vars to avoid duplication
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_INTERNAL_PORT}/${POSTGRES_DB}
+    ports:
+      - "${BACKEND_EXTERNAL_PORT}:${BACKEND_PORT}"
+    networks:
+      - default_net
+    restart: always
+
+  frontend:
+    build: ${FRONTEND_BUILD_CONTEXT}
+    container_name: frontend
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_EXTERNAL_PORT}:80"
+    networks:
+      - default_net
+    restart: always
 
 volumes:
   postgres_data:
   elasticsearch_data:
+
+networks:
+  default_net:
+    driver: bridge
+    name: ${NETWORK_NAME}

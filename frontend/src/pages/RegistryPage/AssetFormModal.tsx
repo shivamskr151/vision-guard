@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react'
 import styles from './RegistryPage.module.css'
-import type { RegistryAsset, AssetStatus, SchemaLibraryItem, InspectionTemplateItem } from '@/types'
+import type { RegistryAsset, SchemaLibraryItem, InspectionTemplateItem } from '@/types'
 
 interface AssetFormModalProps {
     isOpen: boolean
@@ -10,20 +10,12 @@ interface AssetFormModalProps {
     initialData?: RegistryAsset | null
     assetTypes: string[]
     zones: string[]
-    healthStatuses: AssetStatus[]
+
     schemas: SchemaLibraryItem[]
     templates: InspectionTemplateItem[]
 }
 
-function IconSchema() {
-    return (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <rect x="4" y="2" width="14" height="18" rx="1.5" fill="currentColor" opacity="0.4" />
-            <rect x="6" y="4" width="14" height="18" rx="1.5" fill="currentColor" opacity="0.65" />
-            <rect x="8" y="6" width="14" height="18" rx="1.5" fill="currentColor" />
-        </svg>
-    )
-}
+
 
 function IconCheck() {
     return (
@@ -33,7 +25,7 @@ function IconCheck() {
     )
 }
 
-export function AssetFormModal({ isOpen, onClose, onSave, initialData, assetTypes, zones, healthStatuses, schemas = [], templates = [] }: AssetFormModalProps) {
+export function AssetFormModal({ isOpen, onClose, onSave, initialData, assetTypes, zones, schemas = [], templates = [] }: AssetFormModalProps) {
     const [formData, setFormData] = useState<Partial<RegistryAsset>>({
         assetId: '',
         name: '',

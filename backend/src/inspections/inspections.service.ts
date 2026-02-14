@@ -8,6 +8,7 @@ import * as path from 'path';
 import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { EventsGateway } from '../events/events.gateway';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class InspectionsService implements OnModuleInit {
@@ -19,6 +20,7 @@ export class InspectionsService implements OnModuleInit {
     private readonly elasticsearchService: ElasticsearchService,
     private readonly kafkaProducerService: KafkaProducerService,
     private readonly eventsGateway: EventsGateway,
+    private readonly configService: ConfigService
   ) { }
 
   async onModuleInit() {
@@ -28,7 +30,10 @@ export class InspectionsService implements OnModuleInit {
 
   private startInspectionStream() {
     this.logger.log('Starting Inspection Stream from CSV...');
-    const csvPath = path.join(process.cwd(), 'Data', 'inspection_updates.csv');
+    const dataDir: string = this.configService.get<string>('DATA_DIR') || 'Data';
+    const fileName: string = this.configService.get<string>('INSPECTION_UPDATES_FILE') || 'inspection_updates.csv';
+    const csvPath = path.join(process.cwd(), dataDir, fileName);
+    const intervalMs = parseInt(this.configService.get<string>('INSPECTION_STREAM_INTERVAL') || '3000');
 
     setInterval(async () => {
       try {
@@ -67,7 +72,7 @@ export class InspectionsService implements OnModuleInit {
       } catch (error) {
         this.logger.error('Error in inspection stream', error);
       }
-    }, 3000); // Every 3 seconds
+    }, intervalMs);
   }
 
   async createIndex() {

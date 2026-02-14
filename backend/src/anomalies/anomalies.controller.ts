@@ -82,44 +82,7 @@ export class AnomaliesController {
 
     @Get('map')
     async getMap() {
-        // Return markers
-        const result = await this.elasticsearchService.search({
-            index: 'anomaly_events',
-            size: 100,
-        });
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const hits = result.hits.hits as any[];
-
-        const markers = hits.map((hit, index) => {
-            const source = hit._source;
-            const regionMap: Record<string, string> = {
-                'South Plant': 'south-plant',
-                'North Plant': 'north-plant',
-                'Processing Unit A': 'processing-a',
-                'Processing Unit B': 'processing-b',
-                'Storage Area': 'storage',
-            };
-
-            return {
-                id: `am-${source.id}`,
-                regionId: regionMap[source.location] || 'north-plant',
-                x: 20 + (index * 10), // scatter them
-                y: 20 + (index * 5),
-                type: source.severity === 'critical' ? 'hotspot' : 'camera',
-                hotspotIcon: source.severity === 'critical' ? 'warning' : undefined,
-            };
-        });
-
-        const regions = [
-            { id: 'north-plant', label: 'North Plant', x: 5, y: 5, width: 25, height: 40 },
-            { id: 'processing-a', label: 'Processing Unit A', x: 32, y: 5, width: 25, height: 40 },
-            { id: 'storage', label: 'Storage Area', x: 59, y: 5, width: 25, height: 40 },
-            { id: 'processing-b', label: 'Processing Unit B', x: 5, y: 50, width: 35, height: 45 },
-            { id: 'south-plant', label: 'South Plant', x: 42, y: 50, width: 42, height: 45 },
-        ];
-
-        return { regions, markers };
+        return this.anomaliesService.getMapData();
     }
 
     @Get('cameras')

@@ -551,7 +551,7 @@ export function RegistryPage() {
   // Config State
   const [assetTypes, setAssetTypes] = useState<string[]>([])
   const [zones, setZones] = useState<string[]>([])
-  const [healthStatuses, setHealthStatuses] = useState<AssetStatus[]>([])
+  const [, setHealthStatuses] = useState<AssetStatus[]>([])
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -734,7 +734,6 @@ export function RegistryPage() {
         initialData={editingAsset}
         assetTypes={assetTypes}
         zones={zones}
-        healthStatuses={healthStatuses}
         schemas={schemas}
         templates={templates}
       />

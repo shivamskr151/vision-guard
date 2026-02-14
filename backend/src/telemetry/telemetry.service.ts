@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { EventsGateway } from '../events/events.gateway';
 import { Payload } from '@nestjs/microservices';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class TelemetryService implements OnModuleInit {
@@ -16,6 +17,7 @@ export class TelemetryService implements OnModuleInit {
         private readonly prisma: PrismaService,
         private readonly elasticsearchService: ElasticsearchService,
         private readonly eventsGateway: EventsGateway,
+        private readonly configService: ConfigService
     ) { }
 
     async onModuleInit() {
@@ -24,7 +26,10 @@ export class TelemetryService implements OnModuleInit {
 
     private startTelemetryStream() {
         this.logger.log('Starting Asset Telemetry Stream from CSV...');
-        const csvPath = path.join(process.cwd(), 'Data', 'telemetry_data.csv');
+        const dataDir: string = this.configService.get<string>('DATA_DIR') || 'Data';
+        const fileName: string = this.configService.get<string>('TELEMETRY_DATA_FILE') || 'telemetry_data.csv';
+        const csvPath = path.join(process.cwd(), dataDir, fileName);
+        const intervalMs = parseInt(this.configService.get<string>('TELEMETRY_STREAM_INTERVAL') || '2000');
 
         setInterval(async () => {
             try {
@@ -66,7 +71,7 @@ export class TelemetryService implements OnModuleInit {
             } catch (error) {
                 this.logger.error('Error in telemetry stream', error);
             }
-        }, 2000); // Update every 2 seconds
+        }, intervalMs);
     }
 
     async saveTelemetry(data: any) {
