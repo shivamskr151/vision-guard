@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSocket } from '@/context/SocketContext';
 import type { KPICardData, MapMarker } from '@/types';
+import { config } from '@/config';
 
 export function useDashboardData() {
     const [kpiCards, setKpiCards] = useState<KPICardData[]>([]);
@@ -14,7 +15,7 @@ export function useDashboardData() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL}/inspections/dashboard`);
+                const response = await fetch(`${config.API_URL}/inspections/dashboard`);
 
                 if (!response.ok) {
                     throw new Error('Failed to fetch dashboard data');

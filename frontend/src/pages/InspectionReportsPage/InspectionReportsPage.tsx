@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { config } from '@/config'
 import {
   STATUS_FILTER_OPTIONS,
 } from '@/data/inspectionConstants'
@@ -87,7 +88,7 @@ export function InspectionReportsPage() {
     const fetchReports = async () => {
       setLoading(true)
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/inspections/reports?page=${currentPage}&limit=${LIMIT}&status=${statusFilter}`)
+        const res = await fetch(`${config.API_URL}/inspections/reports?page=${currentPage}&limit=${LIMIT}&status=${statusFilter}`)
         if (res.ok) {
           const result = await res.json()
           setReports(result.data || [])

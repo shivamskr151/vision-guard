@@ -15,6 +15,7 @@ import {
   Line
 } from 'recharts';
 import styles from './InspectionsPage.module.css';
+import { config } from '@/config';
 
 // --- Icons ---
 const DownloadIcon = ({ size = 18 }: { size?: number }) => (
@@ -66,9 +67,9 @@ export const InspectionsPage: React.FC = () => {
       try {
         setLoading(true);
         const [dashboardRes, upcomingRes, assetsRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}/inspections/dashboard`),
-          fetch(`${import.meta.env.VITE_API_URL}/inspections/upcoming`),
-          fetch(`${import.meta.env.VITE_API_URL}/assets`)
+          fetch(`${config.API_URL}/inspections/dashboard`),
+          fetch(`${config.API_URL}/inspections/upcoming`),
+          fetch(`${config.API_URL}/assets`)
         ]);
 
         if (dashboardRes.ok && upcomingRes.ok) {
@@ -200,7 +201,7 @@ export const InspectionsPage: React.FC = () => {
     if (!formData.assetId || !formData.scheduledDate) return;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/inspections`, {
+      const response = await fetch(`${config.API_URL}/inspections`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -217,7 +218,7 @@ export const InspectionsPage: React.FC = () => {
         setIsModalOpen(false);
         setFormData({ assetId: '', scheduledDate: '', type: 'Routine' });
         // Refresh data immediately
-        const upcomingRes = await fetch(`${import.meta.env.VITE_API_URL}/inspections/upcoming`);
+        const upcomingRes = await fetch(`${config.API_URL}/inspections/upcoming`);
         if (upcomingRes.ok) {
           const upcoming = await upcomingRes.json();
           setUpcomingInspections(upcoming);

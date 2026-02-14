@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { config } from '@/config';
 
 interface SocketContextType {
     socket: WebSocket | null;
@@ -21,7 +22,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         // Create native WebSocket connection
         // Assuming backend runs on same host/port logic or use env
         // VITE_API_URL is mostly http://... so we replace http with ws
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const apiUrl = config.API_URL;
         const wsUrl = apiUrl.replace(/^http/, 'ws');
 
         let ws: WebSocket;

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSocket } from '@/context/SocketContext';
 import type { AnomalyKpiCard, AnomalyEvent, AnomalyMapMarker, CameraStream, MapRegion } from '@/types';
+import { config } from '@/config';
 
 export function useAnomalyData(filters?: Record<string, string>) {
     const [kpiCards, setKpiCards] = useState<AnomalyKpiCard[]>([]);
@@ -16,10 +17,10 @@ export function useAnomalyData(filters?: Record<string, string>) {
             try {
                 const queryParams = new URLSearchParams(filters as any).toString();
                 const [statsRes, eventsRes, mapRes, camerasRes] = await Promise.all([
-                    fetch(`${import.meta.env.VITE_API_URL}/anomalies/stats?${queryParams}`),
-                    fetch(`${import.meta.env.VITE_API_URL}/anomalies/events`),
-                    fetch(`${import.meta.env.VITE_API_URL}/anomalies/map`),
-                    fetch(`${import.meta.env.VITE_API_URL}/anomalies/cameras`),
+                    fetch(`${config.API_URL}/anomalies/stats?${queryParams}`),
+                    fetch(`${config.API_URL}/anomalies/events`),
+                    fetch(`${config.API_URL}/anomalies/map`),
+                    fetch(`${config.API_URL}/anomalies/cameras`),
                 ]);
 
                 if (!statsRes.ok || !eventsRes.ok || !mapRes.ok || !camerasRes.ok) {

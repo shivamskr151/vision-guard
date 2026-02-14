@@ -3,6 +3,7 @@ import type { RegistryTabId, RegistryAsset, AssetStatus, SchemaLibraryItem, Cust
 import { REGISTRY_TABS, CUSTOM_FIELDS_INITIAL, INSPECTION_CHECKLIST_INITIAL } from '@/data/registryConstants'
 import styles from './RegistryPage.module.css'
 import { AssetFormModal } from './AssetFormModal'
+import { config } from '@/config'
 
 const healthClass = {
   good: styles.healthGood,
@@ -160,7 +161,7 @@ function CustomFieldSchemaSection({
   }
 
   const handleSaveSchema = () => {
-    fetch(`${import.meta.env.VITE_API_URL}/assets/schemas`, {
+    fetch(`${config.API_URL}/assets/schemas`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -326,7 +327,7 @@ function InspectionTemplateConfigSection({
   }
 
   const handleSaveTemplate = () => {
-    fetch(`${import.meta.env.VITE_API_URL}/assets/templates`, {
+    fetch(`${config.API_URL}/assets/templates`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -559,7 +560,7 @@ export function RegistryPage() {
 
   const fetchAssets = () => {
     setLoading(true)
-    fetch(`${import.meta.env.VITE_API_URL}/assets`)
+    fetch(`${config.API_URL}/assets`)
       .then(res => res.json())
       .then(setAssets)
       .catch(console.error)
@@ -568,7 +569,7 @@ export function RegistryPage() {
 
   useEffect(() => {
     // Fetch system config on mount
-    fetch(`${import.meta.env.VITE_API_URL}/assets/config`)
+    fetch(`${config.API_URL}/assets/config`)
       .then(res => res.json())
       .then(data => {
         setAssetTypes(data.assetTypes || [])
@@ -578,20 +579,20 @@ export function RegistryPage() {
       .catch(console.error)
 
     // Pre-fetch Schemas and Templates for the "Create Asset" modal
-    fetch(`${import.meta.env.VITE_API_URL}/assets/schemas`).then(res => res.json()).then(setSchemas).catch(console.error)
-    fetch(`${import.meta.env.VITE_API_URL}/assets/templates`).then(res => res.json()).then(setTemplates).catch(console.error)
+    fetch(`${config.API_URL}/assets/schemas`).then(res => res.json()).then(setSchemas).catch(console.error)
+    fetch(`${config.API_URL}/assets/templates`).then(res => res.json()).then(setTemplates).catch(console.error)
   }, [])
 
   useEffect(() => {
     if (activeTab === 'asset-list') {
       fetchAssets()
     } else if (activeTab === 'schema-builder') {
-      fetch(`${import.meta.env.VITE_API_URL}/assets/schemas`)
+      fetch(`${config.API_URL}/assets/schemas`)
         .then(res => res.json())
         .then(setSchemas)
         .catch(console.error)
     } else if (activeTab === 'inspection-templates') {
-      fetch(`${import.meta.env.VITE_API_URL}/assets/templates`)
+      fetch(`${config.API_URL}/assets/templates`)
         .then(res => res.json())
         .then(setTemplates)
         .catch(console.error)
@@ -602,7 +603,7 @@ export function RegistryPage() {
     setEditingAsset(null)
     setIsModalOpen(true)
     // Refresh schemas to ensure we have the latest fields
-    fetch(`${import.meta.env.VITE_API_URL}/assets/schemas`)
+    fetch(`${config.API_URL}/assets/schemas`)
       .then(res => res.json())
       .then(setSchemas)
       .catch(console.error)
@@ -616,7 +617,7 @@ export function RegistryPage() {
   const handleDelete = (id: string | number) => {
     if (!confirm('Are you sure you want to delete this asset?')) return
 
-    fetch(`${import.meta.env.VITE_API_URL}/assets/${id}`, {
+    fetch(`${config.API_URL}/assets/${id}`, {
       method: 'DELETE',
     })
       .then(() => {
@@ -627,8 +628,8 @@ export function RegistryPage() {
 
   const handleSave = async (assetData: Partial<RegistryAsset>) => {
     const url = editingAsset
-      ? `${import.meta.env.VITE_API_URL}/assets/${editingAsset.id}`
-      : `${import.meta.env.VITE_API_URL}/assets`
+      ? `${config.API_URL}/assets/${editingAsset.id}`
+      : `${config.API_URL}/assets`
 
     const method = editingAsset ? 'PATCH' : 'POST'
 
