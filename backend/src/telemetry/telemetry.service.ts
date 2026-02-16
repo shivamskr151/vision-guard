@@ -21,7 +21,12 @@ export class TelemetryService implements OnModuleInit {
     ) { }
 
     async onModuleInit() {
-        this.startTelemetryStream();
+        const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+        if (!isProduction) {
+            this.startTelemetryStream();
+        } else {
+            this.logger.log('Production mode: Simulation stream disabled.');
+        }
     }
 
     private startTelemetryStream() {

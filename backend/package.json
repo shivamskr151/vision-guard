@@ -33,6 +33,8 @@
     "@nestjs/websockets": "^11.1.13",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.3",
     "csv-parser": "^3.2.0",
     "kafkajs": "^2.2.4",
     "pg": "^8.18.0",

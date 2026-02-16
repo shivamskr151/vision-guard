@@ -22,7 +22,12 @@ export class AnomaliesService implements OnModuleInit {
     ) { }
 
     async onModuleInit() {
-        this.startSimulation();
+        const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+        if (!isProduction) {
+            this.startSimulation();
+        } else {
+            this.logger.log('Production mode: Simulation stream disabled.');
+        }
     }
 
     private startSimulation() {

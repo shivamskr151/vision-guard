@@ -25,7 +25,12 @@ export class InspectionsService implements OnModuleInit {
 
   async onModuleInit() {
     this.createIndex();
-    this.startInspectionStream();
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    if (!isProduction) {
+      this.startInspectionStream();
+    } else {
+      this.logger.log('Production mode: Simulation stream disabled.');
+    }
   }
 
   private startInspectionStream() {
