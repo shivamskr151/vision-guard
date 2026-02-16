@@ -111,7 +111,6 @@ services:
     networks:
       - default_net
     restart: always
-    restart: always
     environment:
       VITE_API_URL: http://localhost:${BACKEND_EXTERNAL_PORT}
       TZ: Asia/Kolkata
