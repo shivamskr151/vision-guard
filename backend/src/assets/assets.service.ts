@@ -153,10 +153,24 @@ export class AssetsService implements OnModuleInit {
         });
     }
 
-    async findAll() {
-        return this.prisma.asset.findMany({
-            orderBy: { id: 'asc' },
-        });
+    async findAll(page: number = 1, limit: number = 10) {
+        const skip = (page - 1) * limit;
+        const [data, total] = await Promise.all([
+            this.prisma.asset.findMany({
+                orderBy: { id: 'asc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.asset.count(),
+        ]);
+
+        return {
+            data,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        };
     }
 
     async update(id: number, data: Prisma.AssetUpdateInput) {

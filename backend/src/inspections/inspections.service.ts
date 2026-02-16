@@ -391,30 +391,38 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async getUpcoming() {
+  async getUpcoming(page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const nextWeek = new Date(today);
     nextWeek.setDate(today.getDate() + 7);
 
-    const upcoming = await this.prisma.inspection.findMany({
-      where: {
-        status: 'scheduled',
-        scheduledDate: {
-          gte: today,
-          lte: nextWeek
-        }
-      },
-      include: {
-        asset: true
-      },
-      orderBy: {
-        scheduledDate: 'asc'
+    const where = {
+      status: 'scheduled',
+      scheduledDate: {
+        gte: today,
+        lte: nextWeek
       }
-    });
+    };
 
-    return upcoming.map(i => {
+    const [upcoming, total] = await Promise.all([
+      this.prisma.inspection.findMany({
+        where,
+        include: {
+          asset: true
+        },
+        orderBy: {
+          scheduledDate: 'asc'
+        },
+        skip,
+        take: limit
+      }),
+      this.prisma.inspection.count({ where })
+    ]);
+
+    const data = upcoming.map(i => {
       const daysDiff = Math.ceil((new Date(i.scheduledDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
       return {
         id: i.id,
@@ -426,6 +434,14 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
         status: i.status === 'overdue' ? 'overdue' : (daysDiff <= 2 ? 'urgent' : 'due')
       };
     });
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   async getRealtimeGraphsData(range: string = 'week') {

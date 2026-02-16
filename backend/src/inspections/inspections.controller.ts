@@ -29,8 +29,11 @@ export class InspectionsController {
   }
 
   @Get('upcoming')
-  getUpcoming() {
-    return this.inspectionsService.getUpcoming();
+  getUpcoming(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.inspectionsService.getUpcoming(Number(page), Number(limit));
   }
 
   @Get('reports')

@@ -5,6 +5,7 @@ import {
 } from '@/data/inspectionConstants'
 import type { InspectionReportRow } from '@/types'
 import styles from './InspectionReportsPage.module.css'
+import { Pagination } from '@/components/ui/Pagination'
 
 function IconFilter({ className, size = 18 }: { className?: string; size?: number }) {
   return (
@@ -233,24 +234,12 @@ export function InspectionReportsPage() {
         </table>
       </div>
 
-      {/* Pagination Controls */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem', paddingBottom: '2rem' }}>
-        <button
-          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-          disabled={currentPage === 1 || loading}
-          style={{ padding: '0.5rem 1rem', background: '#374151', color: 'white', border: 'none', borderRadius: '4px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1 }}
-        >
-          Previous
-        </button>
-        <span style={{ color: '#fff' }}>Page {currentPage} of {totalPages}</span>
-        <button
-          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-          disabled={currentPage === totalPages || loading}
-          style={{ padding: '0.5rem 1rem', background: '#374151', color: 'white', border: 'none', borderRadius: '4px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1 }}
-        >
-          Next
-        </button>
-      </div>
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        loading={loading}
+      />
 
     </div>
   )

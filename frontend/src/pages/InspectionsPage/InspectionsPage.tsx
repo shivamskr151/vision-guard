@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import styles from './InspectionsPage.module.css';
 import { config } from '@/config';
+import { Pagination } from '@/components/ui/Pagination';
 
 // --- Icons ---
 const DownloadIcon = ({ size = 18 }: { size?: number }) => (
@@ -51,7 +52,7 @@ export const InspectionsPage: React.FC = () => {
   const [upcomingInspections, setUpcomingInspections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [totalPages, setTotalPages] = useState(1);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,7 +69,7 @@ export const InspectionsPage: React.FC = () => {
         setLoading(true);
         const [dashboardRes, upcomingRes, assetsRes] = await Promise.all([
           fetch(`${config.API_URL}/inspections/dashboard`),
-          fetch(`${config.API_URL}/inspections/upcoming`),
+          fetch(`${config.API_URL}/inspections/upcoming?page=${currentPage}&limit=10`),
           fetch(`${config.API_URL}/assets`)
         ]);
 
@@ -76,12 +77,13 @@ export const InspectionsPage: React.FC = () => {
           const dashboard = await dashboardRes.json();
           const upcoming = await upcomingRes.json();
           setDashboardData(dashboard);
-          setUpcomingInspections(upcoming);
+          setUpcomingInspections(upcoming.data || []);
+          setTotalPages(upcoming.totalPages || 1);
         }
 
         if (assetsRes.ok) {
           const assetsList = await assetsRes.json();
-          setAssets(assetsList);
+          setAssets(assetsList.data || []);
         }
       } catch (error) {
         console.error("Error fetching inspection data:", error);
@@ -91,7 +93,7 @@ export const InspectionsPage: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [currentPage]);
 
   const { lastTelemetry, lastAnomaly, lastInspectionStats } = useSocket();
 
@@ -218,10 +220,11 @@ export const InspectionsPage: React.FC = () => {
         setIsModalOpen(false);
         setFormData({ assetId: '', scheduledDate: '', type: 'Routine' });
         // Refresh data immediately
-        const upcomingRes = await fetch(`${config.API_URL}/inspections/upcoming`);
+        const upcomingRes = await fetch(`${config.API_URL}/inspections/upcoming?page=${currentPage}&limit=10`);
         if (upcomingRes.ok) {
           const upcoming = await upcomingRes.json();
-          setUpcomingInspections(upcoming);
+          setUpcomingInspections(upcoming.data || []);
+          setTotalPages(upcoming.totalPages || 1);
         }
       } else {
         alert('Failed to schedule inspection');
@@ -455,7 +458,7 @@ export const InspectionsPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {upcomingInspections.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((inspection) => (
+            {upcomingInspections.map((inspection) => (
               <tr key={inspection.id}>
                 <td className={styles.assetName}>
                   {inspection.assetName}
@@ -478,27 +481,12 @@ export const InspectionsPage: React.FC = () => {
             )}
           </tbody>
         </table>
-        {upcomingInspections.length > itemsPerPage && (
-          <div className={styles.pagination}>
-            <button
-              className={styles.pageButton}
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </button>
-            <span className={styles.pageInfo}>
-              Page {currentPage} of {Math.ceil(upcomingInspections.length / itemsPerPage)}
-            </span>
-            <button
-              className={styles.pageButton}
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(upcomingInspections.length / itemsPerPage)))}
-              disabled={currentPage === Math.ceil(upcomingInspections.length / itemsPerPage)}
-            >
-              Next
-            </button>
-          </div>
-        )}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          loading={loading}
+        />
       </div>
 
       <div className={styles.sectionHeader}>

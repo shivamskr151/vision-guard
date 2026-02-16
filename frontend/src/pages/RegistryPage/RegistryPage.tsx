@@ -4,6 +4,7 @@ import { REGISTRY_TABS, CUSTOM_FIELDS_INITIAL, INSPECTION_CHECKLIST_INITIAL } fr
 import styles from './RegistryPage.module.css'
 import { AssetFormModal } from './AssetFormModal'
 import { config } from '@/config'
+import { Pagination } from '@/components/ui/Pagination'
 
 const healthClass = {
   good: styles.healthGood,
@@ -548,6 +549,9 @@ export function RegistryPage() {
   const [schemas, setSchemas] = useState<SchemaLibraryItem[]>([])
   const [templates, setTemplates] = useState<InspectionTemplateItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const LIMIT = 10
 
   // Config State
   const [assetTypes, setAssetTypes] = useState<string[]>([])
@@ -560,9 +564,12 @@ export function RegistryPage() {
 
   const fetchAssets = () => {
     setLoading(true)
-    fetch(`${config.API_URL}/assets`)
+    fetch(`${config.API_URL}/assets?page=${currentPage}&limit=${LIMIT}`)
       .then(res => res.json())
-      .then(setAssets)
+      .then(data => {
+        setAssets(data.data || [])
+        setTotalPages(data.totalPages || 1)
+      })
       .catch(console.error)
       .finally(() => setLoading(false))
   }
@@ -597,7 +604,7 @@ export function RegistryPage() {
         .then(setTemplates)
         .catch(console.error)
     }
-  }, [activeTab])
+  }, [activeTab, currentPage])
 
   const handleCreate = () => {
     setEditingAsset(null)
@@ -699,11 +706,19 @@ export function RegistryPage() {
         {activeTab === 'asset-list' && (
           <div id="panel-asset-list" role="tabpanel" aria-labelledby="tab-asset-list">
             {loading && assets.length === 0 ? <div>Loading assets...</div> : (
-              <AssetListTable
-                assets={assets}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
+              <>
+                <AssetListTable
+                  assets={assets}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  loading={loading}
+                />
+              </>
             )}
           </div>
         )}

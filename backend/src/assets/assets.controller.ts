@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { AssetsService } from './assets.service';
 import { Prisma } from '@prisma/client';
 import { EventPattern, Payload } from '@nestjs/microservices';
@@ -23,8 +23,11 @@ export class AssetsController {
     }
 
     @Get()
-    findAll() {
-        return this.assetsService.findAll();
+    findAll(
+        @Query('page') page: number = 1,
+        @Query('limit') limit: number = 10,
+    ) {
+        return this.assetsService.findAll(Number(page), Number(limit));
     }
 
 
