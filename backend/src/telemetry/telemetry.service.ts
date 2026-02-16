@@ -81,6 +81,7 @@ export class TelemetryService implements OnModuleInit {
 
     async saveTelemetry(data: any) {
         try {
+            // Step 1: DB Save (Source of Truth)
             // Check if asset exists, if not create placeholder
             let asset = await this.prisma.asset.findUnique({
                 where: { assetId: data.assetId },
@@ -88,7 +89,6 @@ export class TelemetryService implements OnModuleInit {
 
             if (!asset) {
                 this.logger.warn(`Asset ${data.assetId} not found, creating placeholder...`);
-                // Create minimal placeholder asset
                 asset = await this.prisma.asset.create({
                     data: {
                         assetId: data.assetId,
@@ -104,7 +104,6 @@ export class TelemetryService implements OnModuleInit {
                 });
             }
 
-            // Save to PostgreSQL
             const savedRecord = await this.prisma.assetTelemetry.create({
                 data: {
                     timestamp: new Date(data.timestamp),
@@ -117,9 +116,13 @@ export class TelemetryService implements OnModuleInit {
                     status: data.status,
                 },
             });
+            this.logger.log(`Saved Telemetry to DB: ${savedRecord.id}`);
 
-            // Index to Elasticsearch
-            await this.elasticsearchService.index({
+            // Step 3: WebSocket (UI Update) - Before ES to ensure immediate reactivity
+            this.eventsGateway.broadcast('telemetry', savedRecord);
+
+            // Step 4: Elasticsearch Index (Async) - Do not await
+            this.elasticsearchService.index({
                 index: 'asset_telemetry',
                 document: {
                     id: savedRecord.id,
@@ -132,13 +135,11 @@ export class TelemetryService implements OnModuleInit {
                     inspectionCompliance: savedRecord.inspectionCompliance,
                     criticalAssetRiskIndex: savedRecord.criticalAssetRiskIndex,
                 },
-            });
-
-            // Emit Real-time Update
-            this.eventsGateway.broadcast('telemetry', savedRecord);
+            }).catch(err => this.logger.error('Async ES Indexing failed', err));
 
         } catch (error) {
             this.logger.error('Error processing telemetry data', error);
         }
     }
+
 }

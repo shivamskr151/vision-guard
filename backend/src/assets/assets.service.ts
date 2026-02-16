@@ -6,6 +6,7 @@ import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class AssetsService implements OnModuleInit {
@@ -14,7 +15,8 @@ export class AssetsService implements OnModuleInit {
         private prisma: PrismaService,
         private elasticsearchService: ElasticsearchService,
         private kafkaProducerService: KafkaProducerService,
-        private configService: ConfigService
+        private configService: ConfigService,
+        private eventsGateway: EventsGateway
     ) { }
 
     async onModuleInit() {
@@ -200,15 +202,19 @@ export class AssetsService implements OnModuleInit {
                 }
             });
             this.logger.log(`Updated zone in DB: ${zone.zoneId}`);
+
+            // WebSocket Broadast
+            this.eventsGateway.broadcast('zone_update', zone);
+
         } catch (error) {
             this.logger.error(`Failed to update zone ${data.zoneId}:`, error);
         }
     }
 
     async updateAssetStatus(data: any) {
-        this.logger.log(`Received asset update: ${data.assetId}`);
+        this.logger.log(`Received asset update for ${data.assetId}`);
         try {
-            // 1. Upsert Asset in PostgreSQL
+            // Step 1: DB Save (Source of Truth)
             const asset = await this.prisma.asset.upsert({
                 where: { assetId: data.assetId },
                 update: {
@@ -244,8 +250,11 @@ export class AssetsService implements OnModuleInit {
 
             this.logger.log(`Saved asset to DB: ${asset.assetId}`);
 
-            // 2. Index to Elasticsearch
-            await this.elasticsearchService.index({
+            // Step 3: WebSocket (UI Update)
+            this.eventsGateway.broadcast('asset_update', asset);
+
+            // Step 4: Elasticsearch Index (Async)
+            this.elasticsearchService.index({
                 index: 'assets',
                 id: asset.assetId,
                 document: {
@@ -261,13 +270,13 @@ export class AssetsService implements OnModuleInit {
                     y: asset.y,
                     updatedAt: new Date(),
                 },
-            } as any);
+            } as any).catch(err => this.logger.error('Async Asset ES Indexing failed', err));
 
-            this.logger.log(`Indexed asset in Elasticsearch: ${asset.assetId}`);
         } catch (error) {
             this.logger.error(`Failed to update asset ${data.assetId}:`, error);
         }
     }
+
 
     async remove(id: number) {
         const asset = await this.prisma.asset.findUnique({ where: { id } });
@@ -322,6 +331,4 @@ export class AssetsService implements OnModuleInit {
             include: { checklist: true },
         });
     }
-
-
 }

@@ -82,7 +82,7 @@ export class AnomaliesService implements OnModuleInit {
         this.logger.log('Received anomaly data:', data);
 
         try {
-            // Check if asset exists
+            // Step 1: DB Save (Source of Truth)
             let asset = await this.prisma.asset.findUnique({
                 where: { assetId: data.assetId },
             });
@@ -104,7 +104,6 @@ export class AnomaliesService implements OnModuleInit {
                 });
             }
 
-            // Save to PostgreSQL
             const savedData = await this.prisma.anomalyEvent.create({
                 data: {
                     timestamp: new Date(data.timestamp),
@@ -119,8 +118,11 @@ export class AnomaliesService implements OnModuleInit {
             });
             this.logger.log(`Saved Anomaly to DB with ID: ${savedData.id}`);
 
-            // Save to Elasticsearch
-            await this.elasticsearchService.index({
+            // Step 3: WebSocket (UI Update)
+            this.eventsGateway.broadcast('anomaly', savedData);
+
+            // Step 4: Elasticsearch Index (Async)
+            this.elasticsearchService.index({
                 index: 'anomaly_events',
                 document: {
                     id: savedData.id,
@@ -133,16 +135,13 @@ export class AnomaliesService implements OnModuleInit {
                     confidence: savedData.confidence,
                     isResolved: savedData.isResolved,
                 },
-            });
-            this.logger.log('Indexed Anomaly in Elasticsearch');
-
-            // Emit Real-time Update
-            this.eventsGateway.broadcast('anomaly', savedData);
+            }).catch(err => this.logger.error('Async Anomaly ES Indexing failed', err));
 
         } catch (error) {
             this.logger.error('Error processing anomaly data', error);
         }
     }
+
     async getMapData() {
         // 1. Fetch Zones from DB
         const zones = await (this.prisma as any).zone.findMany();

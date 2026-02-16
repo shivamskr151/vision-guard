@@ -129,7 +129,7 @@ export class InspectionsService implements OnModuleInit {
     );
 
     try {
-      // Verify asset exists
+      // Step 1: DB Save (Source of Truth)
       let asset = await this.prisma.asset.findUnique({
         where: { assetId: data.assetId },
       });
@@ -151,7 +151,6 @@ export class InspectionsService implements OnModuleInit {
         });
       }
 
-      // Create new inspection in PostgreSQL (always create for real-time updates)
       const inspection = await this.prisma.inspection.create({
         data: {
           assetId: data.assetId,
@@ -169,36 +168,47 @@ export class InspectionsService implements OnModuleInit {
 
       this.logger.log(`Created NEW inspection in DB: ID ${inspection.id}`);
 
-      // Index to Elasticsearch
-      await this.elasticsearchService.index({
-        index: 'inspections',
-        id: inspection.id.toString(),
-        document: {
-          id: inspection.id,
-          assetId: inspection.assetId,
-          inspectorId: inspection.inspectorId,
-          status: inspection.status,
-          result: inspection.result,
-          scheduledDate: inspection.scheduledDate,
-          completedDate: inspection.completedDate,
-          durationSeconds: inspection.durationSeconds,
-          zone: asset.zone,
-          type: asset.type,
-          updatedAt: new Date(),
-        },
-        refresh: true,
-      } as any);
+      // Step 3: WebSocket (UI Update) - Broadcast the specific update immediately
+      this.eventsGateway.broadcast('inspection_update', inspection);
 
-      this.logger.log(`Indexed inspection in Elasticsearch: ID ${inspection.id}`);
+      // Step 4: Elasticsearch Index (Async) & Stats Update
+      // We wrap the ES indexing and subsequent stats push in an async task
+      (async () => {
+        try {
+          await this.elasticsearchService.index({
+            index: 'inspections',
+            id: inspection.id.toString(),
+            document: {
+              id: inspection.id,
+              assetId: inspection.assetId,
+              inspectorId: inspection.inspectorId,
+              status: inspection.status,
+              result: inspection.result,
+              scheduledDate: inspection.scheduledDate,
+              completedDate: inspection.completedDate,
+              durationSeconds: inspection.durationSeconds,
+              zone: asset.zone,
+              type: asset.type,
+              updatedAt: new Date(),
+            },
+            refresh: true, // Ensure stats are accurate for the next step
+          } as any);
 
-      // Fetch updated graph data from ES and broadcast
-      const stats = await this.getRealtimeGraphsData();
-      this.eventsGateway.broadcast('inspection_stats', stats);
+          this.logger.log(`Indexed inspection in ES: ID ${inspection.id}`);
+
+          // Broadcast global stats update after ES is updated
+          const stats = await this.getRealtimeGraphsData();
+          this.eventsGateway.broadcast('inspection_stats', stats);
+        } catch (esError) {
+          this.logger.error('Async ES Pipeline failed', esError);
+        }
+      })();
 
     } catch (error) {
       this.logger.error('Error processing inspection update', error);
     }
   }
+
 
   async getDashboardData(range: string = 'week') {
     // Determine date range for filtering
