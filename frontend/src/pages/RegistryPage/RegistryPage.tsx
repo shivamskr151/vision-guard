@@ -5,6 +5,7 @@ import styles from './RegistryPage.module.css'
 import { AssetFormModal } from './AssetFormModal'
 import { config } from '@/config'
 import { Pagination } from '@/components/ui/Pagination'
+import { usePagination } from '@/hooks/usePagination'
 
 const healthClass = {
   good: styles.healthGood,
@@ -545,13 +546,17 @@ export function RegistryPage() {
   const [inspectionFrequency, setInspectionFrequency] = useState(30)
   const [inspectionDuration, setInspectionDuration] = useState(30)
   const [inspectionChecklist, setInspectionChecklist] = useState<InspectionChecklistItem[]>(INSPECTION_CHECKLIST_INITIAL)
-  const [assets, setAssets] = useState<RegistryAsset[]>([])
   const [schemas, setSchemas] = useState<SchemaLibraryItem[]>([])
   const [templates, setTemplates] = useState<InspectionTemplateItem[]>([])
-  const [loading, setLoading] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const LIMIT = 10
+
+  const {
+    data: assets,
+    loading,
+    currentPage,
+    totalPages,
+    goToPage: setCurrentPage,
+    refresh: fetchAssets
+  } = usePagination<RegistryAsset>(`${config.API_URL}/assets`, { limit: 10 });
 
   // Config State
   const [assetTypes, setAssetTypes] = useState<string[]>([])
@@ -562,17 +567,7 @@ export function RegistryPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingAsset, setEditingAsset] = useState<RegistryAsset | null>(null)
 
-  const fetchAssets = () => {
-    setLoading(true)
-    fetch(`${config.API_URL}/assets?page=${currentPage}&limit=${LIMIT}`)
-      .then(res => res.json())
-      .then(data => {
-        setAssets(data.data || [])
-        setTotalPages(data.totalPages || 1)
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }
+
 
   useEffect(() => {
     // Fetch system config on mount

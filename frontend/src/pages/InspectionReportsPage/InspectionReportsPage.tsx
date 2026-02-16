@@ -6,6 +6,7 @@ import {
 import type { InspectionReportRow } from '@/types'
 import styles from './InspectionReportsPage.module.css'
 import { Pagination } from '@/components/ui/Pagination'
+import { usePagination } from '@/hooks/usePagination'
 
 function IconFilter({ className, size = 18 }: { className?: string; size?: number }) {
   return (
@@ -79,31 +80,23 @@ function StatusBadge({ status }: { status: InspectionReportRow['status'] }) {
 
 export function InspectionReportsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [reports, setReports] = useState<InspectionReportRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const LIMIT = 10
 
+  const {
+    data: reports,
+    loading,
+    currentPage,
+    totalPages,
+    goToPage: setCurrentPage
+  } = usePagination<InspectionReportRow>(`${config.API_URL}/inspections/reports`, {
+    limit: 10,
+    extraParams: { status: statusFilter }
+  });
+
+  // Reset to first page when filter changes
   useEffect(() => {
-    const fetchReports = async () => {
-      setLoading(true)
-      try {
-        const res = await fetch(`${config.API_URL}/inspections/reports?page=${currentPage}&limit=${LIMIT}&status=${statusFilter}`)
-        if (res.ok) {
-          const result = await res.json()
-          setReports(result.data || [])
-          setTotalPages(result.totalPages || 1)
-        }
-      } catch (error) {
-        console.error('Error fetching reports:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
+    setCurrentPage(1);
+  }, [statusFilter]);
 
-    fetchReports()
-  }, [currentPage, statusFilter])
 
 
   // Backend handles filtering now

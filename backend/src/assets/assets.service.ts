@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { EventsGateway } from '../events/events.gateway';
+import { paginate } from '../common/utils/pagination.util';
 
 @Injectable()
 export class AssetsService implements OnModuleInit {
@@ -154,23 +155,9 @@ export class AssetsService implements OnModuleInit {
     }
 
     async findAll(page: number = 1, limit: number = 10) {
-        const skip = (page - 1) * limit;
-        const [data, total] = await Promise.all([
-            this.prisma.asset.findMany({
-                orderBy: { id: 'asc' },
-                skip,
-                take: limit,
-            }),
-            this.prisma.asset.count(),
-        ]);
-
-        return {
-            data,
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-        };
+        return paginate(this.prisma.asset, {
+            orderBy: { id: 'asc' },
+        }, { page, limit });
     }
 
     async update(id: number, data: Prisma.AssetUpdateInput) {

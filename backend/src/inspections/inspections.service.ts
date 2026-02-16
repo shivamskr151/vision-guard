@@ -9,6 +9,7 @@ import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { EventsGateway } from '../events/events.gateway';
 import { ConfigService } from '@nestjs/config';
+import { paginate } from '../common/utils/pagination.util';
 
 @Injectable()
 export class InspectionsService implements OnModuleInit, OnModuleDestroy {
@@ -392,7 +393,6 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getUpcoming(page: number = 1, limit: number = 10) {
-    const skip = (page - 1) * limit;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -407,41 +407,27 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
       }
     };
 
-    const [upcoming, total] = await Promise.all([
-      this.prisma.inspection.findMany({
+    return paginate(
+      this.prisma.inspection,
+      {
         where,
-        include: {
-          asset: true
-        },
-        orderBy: {
-          scheduledDate: 'asc'
-        },
-        skip,
-        take: limit
-      }),
-      this.prisma.inspection.count({ where })
-    ]);
-
-    const data = upcoming.map(i => {
-      const daysDiff = Math.ceil((new Date(i.scheduledDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
-      return {
-        id: i.id,
-        assetName: i.asset.name,
-        type: i.asset.type,
-        zone: i.asset.zone,
-        dueDate: i.scheduledDate.toISOString().split('T')[0],
-        daysUntilDue: daysDiff,
-        status: i.status === 'overdue' ? 'overdue' : (daysDiff <= 2 ? 'urgent' : 'due')
-      };
-    });
-
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
-    };
+        include: { asset: true },
+        orderBy: { scheduledDate: 'asc' }
+      },
+      { page, limit },
+      (data: any[]) => data.map(i => {
+        const daysDiff = Math.ceil((new Date(i.scheduledDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+        return {
+          id: i.id,
+          assetName: i.asset.name,
+          type: i.asset.type,
+          zone: i.asset.zone,
+          dueDate: i.scheduledDate.toISOString().split('T')[0],
+          daysUntilDue: daysDiff,
+          status: i.status === 'overdue' ? 'overdue' : (daysDiff <= 2 ? 'urgent' : 'due')
+        };
+      })
+    );
   }
 
   async getRealtimeGraphsData(range: string = 'week') {
@@ -583,7 +569,6 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getReports(page: number = 1, limit: number = 10, status?: string) {
-    const skip = (page - 1) * limit;
     const where: any = { status: { in: ['completed', 'overdue', 'missed'] } };
 
     if (status && status !== 'all') {
@@ -603,32 +588,29 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const [reports, total] = await Promise.all([
-      this.prisma.inspection.findMany({
+    return paginate(
+      this.prisma.inspection,
+      {
         where,
         include: { asset: true },
-        orderBy: { completedDate: 'desc' },
-        skip,
-        take: limit
-      }),
-      this.prisma.inspection.count({ where })
-    ]);
-
-    const data = reports.map((i: any) => ({
-      id: i.id,
-      assetName: i.asset.name,
-      inspectionDate: i.completedDate ? i.completedDate.toISOString().split('T')[0] : i.scheduledDate.toISOString().split('T')[0],
-      inspectionType: 'Routine',
-      status: i.status === 'completed'
-        ? (i.result === 'pass' ? 'pass' : i.result === 'fail' ? 'fail' : 'partial')
-        : 'fail',
-      defects: i.result === 'fail' ? i.defects : 0,
-      inspector: 'Vision System AI',
-      duration: i.durationSeconds ? `${Math.floor(i.durationSeconds / 60)} min` : '-'
-    }));
-
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+        orderBy: { completedDate: 'desc' }
+      },
+      { page, limit },
+      (data: any[]) => data.map((i: any) => ({
+        id: i.id,
+        assetName: i.asset.name,
+        inspectionDate: i.completedDate ? i.completedDate.toISOString().split('T')[0] : i.scheduledDate.toISOString().split('T')[0],
+        inspectionType: 'Routine',
+        status: i.status === 'completed'
+          ? (i.result === 'pass' ? 'pass' : i.result === 'fail' ? 'fail' : 'partial')
+          : 'fail',
+        defects: i.result === 'fail' ? i.defects : 0,
+        inspector: 'Vision System AI',
+        duration: i.durationSeconds ? `${Math.floor(i.durationSeconds / 60)} min` : '-'
+      }))
+    );
   }
+
 
   async create(createInspectionDto: CreateInspectionDto) {
     const { assetId, scheduledDate, type, status } = createInspectionDto;

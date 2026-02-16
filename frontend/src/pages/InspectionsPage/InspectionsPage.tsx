@@ -17,6 +17,7 @@ import {
 import styles from './InspectionsPage.module.css';
 import { config } from '@/config';
 import { Pagination } from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/usePagination';
 
 // --- Icons ---
 const DownloadIcon = ({ size = 18 }: { size?: number }) => (
@@ -49,14 +50,20 @@ const CameraIcon = ({ size = 18 }: { size?: number }) => (
 
 export const InspectionsPage: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [upcomingInspections, setUpcomingInspections] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [assets, setAssets] = useState<any[]>([]);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
+
+  const {
+    data: upcomingInspections,
+    loading: loadingUpcoming,
+    currentPage,
+    totalPages,
+    goToPage: setCurrentPage,
+    refresh: refreshUpcoming
+  } = usePagination<any>(`${config.API_URL}/inspections/upcoming`, { limit: 10 });
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [assets, setAssets] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     assetId: '',
     scheduledDate: '',
@@ -64,36 +71,34 @@ export const InspectionsPage: React.FC = () => {
   });
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDashboardAndAssets = async () => {
       try {
-        setLoading(true);
-        const [dashboardRes, upcomingRes, assetsRes] = await Promise.all([
+        setLoadingDashboard(true);
+        const [dashboardRes, assetsRes] = await Promise.all([
           fetch(`${config.API_URL}/inspections/dashboard`),
-          fetch(`${config.API_URL}/inspections/upcoming?page=${currentPage}&limit=10`),
           fetch(`${config.API_URL}/assets`)
         ]);
 
-        if (dashboardRes.ok && upcomingRes.ok) {
-          const dashboard = await dashboardRes.json();
-          const upcoming = await upcomingRes.json();
-          setDashboardData(dashboard);
-          setUpcomingInspections(upcoming.data || []);
-          setTotalPages(upcoming.totalPages || 1);
+        if (dashboardRes.ok) {
+          setDashboardData(await dashboardRes.json());
         }
 
         if (assetsRes.ok) {
-          const assetsList = await assetsRes.json();
-          setAssets(assetsList.data || []);
+          const result = await assetsRes.ok ? await assetsRes.json() : { data: [] };
+          setAssets(result.data || []);
         }
       } catch (error) {
         console.error("Error fetching inspection data:", error);
       } finally {
-        setLoading(false);
+        setLoadingDashboard(false);
       }
     };
 
-    fetchData();
-  }, [currentPage]);
+    fetchDashboardAndAssets();
+  }, []);
+
+  const loading = loadingDashboard || loadingUpcoming;
+
 
   const { lastTelemetry, lastAnomaly, lastInspectionStats } = useSocket();
 
@@ -210,7 +215,7 @@ export const InspectionsPage: React.FC = () => {
         },
         body: JSON.stringify({
           assetId: parseInt(formData.assetId),
-          scheduledDate: formData.scheduledDate, // format: YYYY-MM-DD
+          scheduledDate: formData.scheduledDate,
           type: formData.type,
           status: 'scheduled'
         }),
@@ -220,12 +225,7 @@ export const InspectionsPage: React.FC = () => {
         setIsModalOpen(false);
         setFormData({ assetId: '', scheduledDate: '', type: 'Routine' });
         // Refresh data immediately
-        const upcomingRes = await fetch(`${config.API_URL}/inspections/upcoming?page=${currentPage}&limit=10`);
-        if (upcomingRes.ok) {
-          const upcoming = await upcomingRes.json();
-          setUpcomingInspections(upcoming.data || []);
-          setTotalPages(upcoming.totalPages || 1);
-        }
+        refreshUpcoming();
       } else {
         alert('Failed to schedule inspection');
       }
@@ -234,6 +234,7 @@ export const InspectionsPage: React.FC = () => {
       alert('Error scheduling inspection');
     }
   };
+
 
   // ... (KPI Logic remains same)
   const kpiData = dashboardData?.kpi || { due: 0, overdue: 0, completed: 0, sla: 100, averageDuration: 0 };
