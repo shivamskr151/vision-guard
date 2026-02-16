@@ -1,16 +1,16 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { EventsGateway } from '../events/events.gateway';
-import { Payload } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class TelemetryService implements OnModuleInit {
+export class TelemetryService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(TelemetryService.name);
+    private telemetryAggregator: any;
 
     constructor(
         private readonly kafkaProducerService: KafkaProducerService,
@@ -22,11 +22,32 @@ export class TelemetryService implements OnModuleInit {
 
     async onModuleInit() {
         const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+
+        // Initialize Aggregator for high-frequency telemetry
+        this.telemetryAggregator = {
+            buffer: [],
+            timer: null,
+            maxSize: 50, // Flush every 50 records
+            maxTimeMs: 1000, // Or every 1 second
+            add: (item: any) => {
+                this.telemetryAggregator.buffer.push(item);
+                if (this.telemetryAggregator.buffer.length >= this.telemetryAggregator.maxSize) {
+                    this.flushTelemetry();
+                } else if (!this.telemetryAggregator.timer) {
+                    this.telemetryAggregator.timer = setTimeout(() => this.flushTelemetry(), this.telemetryAggregator.maxTimeMs);
+                }
+            }
+        };
+
         if (!isProduction) {
             this.startTelemetryStream();
         } else {
             this.logger.log('Production mode: Simulation stream disabled.');
         }
+    }
+
+    async onModuleDestroy() {
+        await this.flushTelemetry();
     }
 
     private startTelemetryStream() {
@@ -79,10 +100,55 @@ export class TelemetryService implements OnModuleInit {
         }, intervalMs);
     }
 
+    private async flushTelemetry() {
+        if (!this.telemetryAggregator) return;
+
+        if (this.telemetryAggregator.timer) {
+            clearTimeout(this.telemetryAggregator.timer);
+            this.telemetryAggregator.timer = null;
+        }
+
+        if (this.telemetryAggregator.buffer.length === 0) return;
+
+        const batch = [...this.telemetryAggregator.buffer];
+        this.telemetryAggregator.buffer = [];
+
+        this.logger.debug(`Aggregator: Flushing batch of ${batch.length} telemetry records`);
+
+        // Step 3: WebSocket (UI Update)
+        batch.forEach(record => {
+            this.eventsGateway.broadcast('telemetry', record);
+        });
+
+        // Step 4: Elasticsearch Index (Bulk)
+        try {
+            const operations = batch.flatMap(record => [
+                { index: { _index: 'asset_telemetry' } },
+                {
+                    id: record.id,
+                    timestamp: record.timestamp,
+                    assetId: record.assetId,
+                    status: record.status,
+                    assetInspection: record.assetInspection,
+                    assetOverdue: record.assetOverdue,
+                    activeAnomalies: record.activeAnomalies,
+                    inspectionCompliance: record.inspectionCompliance,
+                    criticalAssetRiskIndex: record.criticalAssetRiskIndex,
+                }
+            ]);
+
+            this.elasticsearchService.bulk({
+                refresh: false,
+                operations
+            }).catch(err => this.logger.error('Bulk ES Indexing failed', err));
+        } catch (error) {
+            this.logger.error('Error in Bulk ES Indexing', error);
+        }
+    }
+
     async saveTelemetry(data: any) {
         try {
             // Step 1: DB Save (Source of Truth)
-            // Check if asset exists, if not create placeholder
             let asset = await this.prisma.asset.findUnique({
                 where: { assetId: data.assetId },
             });
@@ -116,30 +182,17 @@ export class TelemetryService implements OnModuleInit {
                     status: data.status,
                 },
             });
-            this.logger.log(`Saved Telemetry to DB: ${savedRecord.id}`);
 
-            // Step 3: WebSocket (UI Update) - Before ES to ensure immediate reactivity
-            this.eventsGateway.broadcast('telemetry', savedRecord);
-
-            // Step 4: Elasticsearch Index (Async) - Do not await
-            this.elasticsearchService.index({
-                index: 'asset_telemetry',
-                document: {
-                    id: savedRecord.id,
-                    timestamp: savedRecord.timestamp,
-                    assetId: savedRecord.assetId,
-                    status: savedRecord.status,
-                    assetInspection: savedRecord.assetInspection,
-                    assetOverdue: savedRecord.assetOverdue,
-                    activeAnomalies: savedRecord.activeAnomalies,
-                    inspectionCompliance: savedRecord.inspectionCompliance,
-                    criticalAssetRiskIndex: savedRecord.criticalAssetRiskIndex,
-                },
-            }).catch(err => this.logger.error('Async ES Indexing failed', err));
+            // Step 2: Aggregator (For Batching downstream operations)
+            if (this.telemetryAggregator) {
+                this.telemetryAggregator.add(savedRecord);
+            } else {
+                // Fallback if aggregator not init
+                this.eventsGateway.broadcast('telemetry', savedRecord);
+            }
 
         } catch (error) {
             this.logger.error('Error processing telemetry data', error);
         }
     }
-
 }

@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { CreateInspectionDto } from './dto/create-inspection.dto';
@@ -11,9 +11,10 @@ import { EventsGateway } from '../events/events.gateway';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class InspectionsService implements OnModuleInit {
+export class InspectionsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(InspectionsService.name);
   private inspectionCounter = 10000;
+  private inspectionAggregator: any;
 
   constructor(
     private prisma: PrismaService,
@@ -26,11 +27,32 @@ export class InspectionsService implements OnModuleInit {
   async onModuleInit() {
     this.createIndex();
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+
+    // Initialize Aggregator for inspections
+    this.inspectionAggregator = {
+      buffer: [],
+      timer: null,
+      maxSize: 10, // Small batch
+      maxTimeMs: 2000, // Or every 2 seconds
+      add: (item: any, asset: any) => {
+        this.inspectionAggregator.buffer.push({ item, asset });
+        if (this.inspectionAggregator.buffer.length >= this.inspectionAggregator.maxSize) {
+          this.flushInspections();
+        } else if (!this.inspectionAggregator.timer) {
+          this.inspectionAggregator.timer = setTimeout(() => this.flushInspections(), this.inspectionAggregator.maxTimeMs);
+        }
+      }
+    };
+
     if (!isProduction) {
       this.startInspectionStream();
     } else {
       this.logger.log('Production mode: Simulation stream disabled.');
     }
+  }
+
+  async onModuleDestroy() {
+    await this.flushInspections();
   }
 
   private startInspectionStream() {
@@ -122,6 +144,54 @@ export class InspectionsService implements OnModuleInit {
     } as any);
   }
 
+  private async flushInspections() {
+    if (!this.inspectionAggregator || this.inspectionAggregator.buffer.length === 0) return;
+
+    if (this.inspectionAggregator.timer) {
+      clearTimeout(this.inspectionAggregator.timer);
+      this.inspectionAggregator.timer = null;
+    }
+
+    const batch = [...this.inspectionAggregator.buffer];
+    this.inspectionAggregator.buffer = [];
+
+    this.logger.debug(`Aggregator: Flushing batch of ${batch.length} inspections`);
+
+    try {
+      // Step 4: Bulk Elasticsearch Index
+      const operations = batch.flatMap(({ item, asset }) => [
+        { index: { _index: 'inspections', _id: item.id.toString() } },
+        {
+          id: item.id,
+          assetId: item.assetId,
+          inspectorId: item.inspectorId,
+          status: item.status,
+          result: item.result,
+          scheduledDate: item.scheduledDate,
+          completedDate: item.completedDate,
+          durationSeconds: item.durationSeconds,
+          zone: asset?.zone,
+          type: asset?.type,
+          updatedAt: new Date(),
+        }
+      ]);
+
+      await this.elasticsearchService.bulk({
+        refresh: true, // Refresh so stats are accurate
+        operations
+      } as any);
+
+      this.logger.log(`Bulk Indexed ${batch.length} inspections in ES`);
+
+      // Broadcast global stats update after ES is updated
+      const stats = await this.getRealtimeGraphsData();
+      this.eventsGateway.broadcast('inspection_stats', stats);
+
+    } catch (error) {
+      this.logger.error('Error in Bulk Inspection Flush', error);
+    }
+  }
+
   @EventPattern('inspection_updates')
   async processInspectionUpdate(@Payload() data: any) {
     this.logger.log(
@@ -171,56 +241,31 @@ export class InspectionsService implements OnModuleInit {
       // Step 3: WebSocket (UI Update) - Broadcast the specific update immediately
       this.eventsGateway.broadcast('inspection_update', inspection);
 
-      // Step 4: Elasticsearch Index (Async) & Stats Update
-      // We wrap the ES indexing and subsequent stats push in an async task
-      (async () => {
-        try {
-          await this.elasticsearchService.index({
-            index: 'inspections',
-            id: inspection.id.toString(),
-            document: {
-              id: inspection.id,
-              assetId: inspection.assetId,
-              inspectorId: inspection.inspectorId,
-              status: inspection.status,
-              result: inspection.result,
-              scheduledDate: inspection.scheduledDate,
-              completedDate: inspection.completedDate,
-              durationSeconds: inspection.durationSeconds,
-              zone: asset.zone,
-              type: asset.type,
-              updatedAt: new Date(),
-            },
-            refresh: true, // Ensure stats are accurate for the next step
-          } as any);
-
-          this.logger.log(`Indexed inspection in ES: ID ${inspection.id}`);
-
-          // Broadcast global stats update after ES is updated
-          const stats = await this.getRealtimeGraphsData();
-          this.eventsGateway.broadcast('inspection_stats', stats);
-        } catch (esError) {
-          this.logger.error('Async ES Pipeline failed', esError);
-        }
-      })();
+      // Step 2: Aggregator (For Batching Downstream ES indexing and Stats recalculation)
+      if (this.inspectionAggregator) {
+        this.inspectionAggregator.add(inspection, asset);
+      } else {
+        // Fallback
+        await this.indexInspection(inspection, asset);
+        const stats = await this.getRealtimeGraphsData();
+        this.eventsGateway.broadcast('inspection_stats', stats);
+      }
 
     } catch (error) {
       this.logger.error('Error processing inspection update', error);
     }
   }
 
-
   async getDashboardData(range: string = 'week') {
-    // Determine date range for filtering
     const now = new Date();
     let startDate = new Date();
 
     if (range === 'live') {
-      startDate.setHours(now.getHours() - 1); // Last 1 hour
+      startDate.setHours(now.getHours() - 1);
     } else if (range === 'today') {
-      startDate.setHours(0, 0, 0, 0); // Start of today
+      startDate.setHours(0, 0, 0, 0);
     } else {
-      startDate.setDate(now.getDate() - 7); // Last 7 days
+      startDate.setDate(now.getDate() - 7);
     }
 
     const dueCount = await this.prisma.inspection.count({
@@ -234,7 +279,6 @@ export class InspectionsService implements OnModuleInit {
 
     const overdueCount = await this.prisma.inspection.count({ where: { status: 'overdue' } });
 
-    // Completed in range
     const completedInRange = await this.prisma.inspection.count({
       where: {
         status: 'completed',
@@ -248,7 +292,6 @@ export class InspectionsService implements OnModuleInit {
       }
     });
 
-    // Average Duration (in range)
     const avgDurationAgg = await this.prisma.inspection.aggregate({
       _avg: { durationSeconds: true },
       where: {
@@ -258,7 +301,6 @@ export class InspectionsService implements OnModuleInit {
     });
     const avgDuration = Math.round(avgDurationAgg._avg.durationSeconds || 0);
 
-    // Map Data: Fetch all assets and determine all statuses for the multi-layered map
     const assets = await this.prisma.asset.findMany({
       include: {
         inspections: {
@@ -303,7 +345,7 @@ export class InspectionsService implements OnModuleInit {
         assetId: asset.assetId,
         x: asset.x,
         y: asset.y,
-        healthStatus, // 'good', 'warning', 'critical'
+        healthStatus,
         inspectionDue: isInspectionDue,
         hasAnomaly: anomalyAssetMap.has(asset.assetId) || (latestTelemetry?.activeAnomalies && latestTelemetry.activeAnomalies > 0),
         hasCamera: (asset.linkedCameras || 0) > 0,
@@ -312,25 +354,17 @@ export class InspectionsService implements OnModuleInit {
       };
     });
 
-    // Fetch zones from DB
     const dbZones = await (this.prisma as any).zone.findMany();
-
-    // Total Assets
     const totalAssets = await this.prisma.asset.count();
-
-    // Active Anomalies (unresolved)
     const activeAnomaliesCount = await this.prisma.anomalyEvent.count({
       where: { isResolved: false }
     });
 
-    // Calculate Risk Index (Weighted average of anomalies and overdue inspections)
     const rawRisk = (activeAnomaliesCount * 1.5) + (overdueCount * 2.5);
     const riskIndex = parseFloat(Math.min(100, rawRisk).toFixed(1));
 
-    // SLA Compliance (in range)
     const slaCompliance = totalInRange > 0 ? ((completedInRange / totalInRange) * 100).toFixed(1) : '100.0';
 
-    // Fetch Graph Data from Elasticsearch (Centralized method) with range
     const graphData = await this.getRealtimeGraphsData(range);
 
     return {
@@ -344,7 +378,6 @@ export class InspectionsService implements OnModuleInit {
         riskIndex,
         averageDuration: avgDuration
       },
-      // Spread graph data (timeline, zoneCoverage, typeDistribution, complianceTrend)
       ...graphData,
       mapData: mapData,
       mapZones: dbZones.map(z => ({
@@ -360,10 +393,10 @@ export class InspectionsService implements OnModuleInit {
 
   async getUpcoming() {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today
+    today.setHours(0, 0, 0, 0);
 
     const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7); // 7 days from today
+    nextWeek.setDate(today.getDate() + 7);
 
     const upcoming = await this.prisma.inspection.findMany({
       where: {
@@ -406,7 +439,7 @@ export class InspectionsService implements OnModuleInit {
       interval = '5m';
       isFixed = true;
     } else if (range === 'today') {
-      gte = 'now/d'; // Start of today
+      gte = 'now/d';
       interval = 'hour';
       isFixed = false;
     } else if (range === 'week') {
@@ -415,29 +448,18 @@ export class InspectionsService implements OnModuleInit {
       isFixed = false;
     }
 
-    const dateHistogram: any = {
-      field: 'scheduledDate',
-    };
-
+    const dateHistogram: any = { field: 'scheduledDate' };
     if (isFixed) {
       dateHistogram.fixed_interval = interval;
     } else {
       dateHistogram.calendar_interval = interval;
     }
 
-    // 1. Timeline: Inspections scheduled per day/interval
     const timelineRes = await this.elasticsearchService.search({
       index: 'inspections',
       body: {
         size: 0,
-        query: {
-          range: {
-            scheduledDate: {
-              gte,
-              lte
-            }
-          }
-        },
+        query: { range: { scheduledDate: { gte, lte } } },
         aggs: {
           inspections_over_time: {
             date_histogram: dateHistogram
@@ -454,23 +476,16 @@ export class InspectionsService implements OnModuleInit {
       count: b.doc_count
     }));
 
-    // 2. Zone Coverage: % Completed / Total per Zone (filtered by range)
     const zoneCoverageRes = await this.elasticsearchService.search({
       index: 'inspections',
       body: {
         size: 0,
-        query: { // Add filtering for zone coverage
-          range: {
-            scheduledDate: { gte, lte }
-          }
-        },
+        query: { range: { scheduledDate: { gte, lte } } },
         aggs: {
           zones: {
             terms: { field: 'zone', size: 20 },
             aggs: {
-              completed: {
-                filter: { term: { 'status': 'completed' } }
-              }
+              completed: { filter: { term: { 'status': 'completed' } } }
             }
           }
         }
@@ -483,14 +498,7 @@ export class InspectionsService implements OnModuleInit {
       percentage: Math.round((b.completed.doc_count / (b.doc_count || 1)) * 100)
     }));
 
-    // 3. Compliance Trend: Monthly? No, adapt to range
-    // If range is live/today, trend might be meaningless or hourly
-    const trendConfig: any = {
-      gte: 'now-6M/M',
-      lte: 'now/M',
-      interval: 'month'
-    };
-
+    const trendConfig: any = { gte: 'now-6M/M', lte: 'now/M', interval: 'month' };
     if (range === 'live' || range === 'today') {
       trendConfig.gte = 'now-24h';
       trendConfig.interval = 'hour';
@@ -503,14 +511,7 @@ export class InspectionsService implements OnModuleInit {
       index: 'inspections',
       body: {
         size: 0,
-        query: {
-          range: {
-            scheduledDate: {
-              gte: trendConfig.gte,
-              lte: trendConfig.lte
-            }
-          }
-        },
+        query: { range: { scheduledDate: { gte: trendConfig.gte, lte: trendConfig.lte } } },
         aggs: {
           months: {
             date_histogram: {
@@ -519,9 +520,7 @@ export class InspectionsService implements OnModuleInit {
               format: range === 'week' ? 'dd MMM' : (range === 'live' ? 'HH:mm' : 'MMM')
             },
             aggs: {
-              completed: {
-                filter: { term: { status: 'completed' } }
-              }
+              completed: { filter: { term: { status: 'completed' } } }
             }
           }
         }
@@ -534,18 +533,13 @@ export class InspectionsService implements OnModuleInit {
       value: Math.round((b.completed.doc_count / (b.doc_count || 1)) * 100)
     }));
 
-    // 4. Asset Type Distribution (in range)
     const typeDistRes = await this.elasticsearchService.search({
       index: 'inspections',
       body: {
         size: 0,
-        query: {
-          range: { scheduledDate: { gte, lte } }
-        },
+        query: { range: { scheduledDate: { gte, lte } } },
         aggs: {
-          types: {
-            terms: { field: 'type', size: 10 }
-          }
+          types: { terms: { field: 'type', size: 10 } }
         }
       }
     } as any);
@@ -557,7 +551,6 @@ export class InspectionsService implements OnModuleInit {
       percentage: 0
     }));
 
-    // Calculate percentages and add colors
     const totalTypes = typeData.reduce((sum: number, item: any) => sum + item.value, 0);
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
     typeData.forEach((item: any, index: number) => {
@@ -575,25 +568,19 @@ export class InspectionsService implements OnModuleInit {
 
   async getReports(page: number = 1, limit: number = 10, status?: string) {
     const skip = (page - 1) * limit;
+    const where: any = { status: { in: ['completed', 'overdue', 'missed'] } };
 
-    // Base filter for historically relevant inspections
-    const where: any = {
-      status: { in: ['completed', 'overdue', 'missed'] }
-    };
-
-    // Apply status filter based on UI mapping logic
     if (status && status !== 'all') {
       if (status === 'pass') {
         where.status = 'completed';
         where.result = 'pass';
       } else if (status === 'fail') {
-        // Fail includes failed inspections AND overdue/missed items
         where.OR = [
           { status: 'completed', result: 'fail' },
           { status: 'overdue' },
           { status: 'missed' }
         ];
-        delete where.status; // Remove base status filter as OR handles it
+        delete where.status;
       } else if (status === 'partial') {
         where.status = 'completed';
         where.result = { notIn: ['pass', 'fail'] };
@@ -603,25 +590,19 @@ export class InspectionsService implements OnModuleInit {
     const [reports, total] = await Promise.all([
       this.prisma.inspection.findMany({
         where,
-        include: {
-          asset: true
-        },
-        orderBy: {
-          completedDate: 'desc'
-        },
+        include: { asset: true },
+        orderBy: { completedDate: 'desc' },
         skip,
         take: limit
       }),
-      this.prisma.inspection.count({
-        where
-      })
+      this.prisma.inspection.count({ where })
     ]);
 
     const data = reports.map((i: any) => ({
       id: i.id,
       assetName: i.asset.name,
       inspectionDate: i.completedDate ? i.completedDate.toISOString().split('T')[0] : i.scheduledDate.toISOString().split('T')[0],
-      inspectionType: 'Routine', // Placeholder or derive from asset type/template
+      inspectionType: 'Routine',
       status: i.status === 'completed'
         ? (i.result === 'pass' ? 'pass' : i.result === 'fail' ? 'fail' : 'partial')
         : 'fail',
@@ -630,20 +611,12 @@ export class InspectionsService implements OnModuleInit {
       duration: i.durationSeconds ? `${Math.floor(i.durationSeconds / 60)} min` : '-'
     }));
 
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
-    };
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async create(createInspectionDto: CreateInspectionDto) {
     const { assetId, scheduledDate, type, status } = createInspectionDto;
-
-    // Validate asset exists
-    const asset = await this.prisma.asset.findUnique({ where: { id: +assetId } }); // CreateInspectionDto assetId might come as string or number depending on validation
+    const asset = await this.prisma.asset.findUnique({ where: { id: +assetId } });
     if (!asset) {
       throw new Error(`Asset with ID ${assetId} not found`);
     }
@@ -658,7 +631,6 @@ export class InspectionsService implements OnModuleInit {
     });
 
     await this.indexInspection(newInspection, asset);
-
     return newInspection;
   }
 
@@ -677,9 +649,7 @@ export class InspectionsService implements OnModuleInit {
   }
 
   async update(id: number, updateInspectionDto: UpdateInspectionDto) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { assetId, ...data } = updateInspectionDto;
-
     const inspection = await this.prisma.inspection.update({
       where: { id },
       data: {
@@ -698,8 +668,6 @@ export class InspectionsService implements OnModuleInit {
     const inspections = await this.prisma.inspection.findMany({
       include: { asset: true }
     });
-
-    console.log(`Syncing ${inspections.length} inspections to Elasticsearch...`);
 
     for (const inspection of inspections) {
       await this.indexInspection(inspection, inspection.asset);

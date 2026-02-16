@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
@@ -6,12 +6,12 @@ import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-
 import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
-export class AnomaliesService implements OnModuleInit {
+export class AnomaliesService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(AnomaliesService.name);
+    private anomalyAggregator: any;
 
     constructor(
         private readonly prisma: PrismaService,
@@ -23,11 +23,32 @@ export class AnomaliesService implements OnModuleInit {
 
     async onModuleInit() {
         const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+
+        // Initialize Aggregator for anomalies
+        this.anomalyAggregator = {
+            buffer: [],
+            timer: null,
+            maxSize: 20, // Smaller batch for critical alerts
+            maxTimeMs: 1000, // Or every 1 second
+            add: (item: any) => {
+                this.anomalyAggregator.buffer.push(item);
+                if (this.anomalyAggregator.buffer.length >= this.anomalyAggregator.maxSize) {
+                    this.flushAnomalies();
+                } else if (!this.anomalyAggregator.timer) {
+                    this.anomalyAggregator.timer = setTimeout(() => this.flushAnomalies(), this.anomalyAggregator.maxTimeMs);
+                }
+            }
+        };
+
         if (!isProduction) {
             this.startSimulation();
         } else {
             this.logger.log('Production mode: Simulation stream disabled.');
         }
+    }
+
+    async onModuleDestroy() {
+        await this.flushAnomalies();
     }
 
     private startSimulation() {
@@ -77,6 +98,50 @@ export class AnomaliesService implements OnModuleInit {
         }, intervalMs);
     }
 
+    private async flushAnomalies() {
+        if (!this.anomalyAggregator || this.anomalyAggregator.buffer.length === 0) return;
+
+        if (this.anomalyAggregator.timer) {
+            clearTimeout(this.anomalyAggregator.timer);
+            this.anomalyAggregator.timer = null;
+        }
+
+        const batch = [...this.anomalyAggregator.buffer];
+        this.anomalyAggregator.buffer = [];
+
+        this.logger.debug(`Aggregator: Flushing batch of ${batch.length} anomalies`);
+
+        // Step 3: WebSocket (UI Update)
+        batch.forEach(record => {
+            this.eventsGateway.broadcast('anomaly', record);
+        });
+
+        // Step 4: Elasticsearch Index (Bulk)
+        try {
+            const operations = batch.flatMap(record => [
+                { index: { _index: 'anomaly_events' } },
+                {
+                    id: record.id,
+                    timestamp: record.timestamp,
+                    severity: record.severity,
+                    type: record.type,
+                    description: record.description,
+                    assetId: record.assetId,
+                    location: record.location,
+                    confidence: record.confidence,
+                    isResolved: record.isResolved,
+                }
+            ]);
+
+            this.elasticsearchService.bulk({
+                refresh: false,
+                operations
+            }).catch(err => this.logger.error('Bulk Anomaly ES Indexing failed', err));
+        } catch (error) {
+            this.logger.error('Error in Bulk Anomaly ES Indexing', error);
+        }
+    }
+
     @EventPattern('anomaly_events')
     async processAnomalyData(@Payload() data: any) {
         this.logger.log('Received anomaly data:', data);
@@ -118,24 +183,12 @@ export class AnomaliesService implements OnModuleInit {
             });
             this.logger.log(`Saved Anomaly to DB with ID: ${savedData.id}`);
 
-            // Step 3: WebSocket (UI Update)
-            this.eventsGateway.broadcast('anomaly', savedData);
-
-            // Step 4: Elasticsearch Index (Async)
-            this.elasticsearchService.index({
-                index: 'anomaly_events',
-                document: {
-                    id: savedData.id,
-                    timestamp: savedData.timestamp,
-                    severity: savedData.severity,
-                    type: savedData.type,
-                    description: savedData.description,
-                    assetId: savedData.assetId,
-                    location: savedData.location,
-                    confidence: savedData.confidence,
-                    isResolved: savedData.isResolved,
-                },
-            }).catch(err => this.logger.error('Async Anomaly ES Indexing failed', err));
+            // Step 2: Aggregator
+            if (this.anomalyAggregator) {
+                this.anomalyAggregator.add(savedData);
+            } else {
+                this.eventsGateway.broadcast('anomaly', savedData);
+            }
 
         } catch (error) {
             this.logger.error('Error processing anomaly data', error);
@@ -143,39 +196,33 @@ export class AnomaliesService implements OnModuleInit {
     }
 
     async getMapData() {
-        // 1. Fetch Zones from DB
         const zones = await (this.prisma as any).zone.findMany();
 
-        // 2. Fetch Anomalies from ES
         const result = await this.elasticsearchService.search({
             index: 'anomaly_events',
             size: 100,
         });
         const hits = result.hits.hits as any[];
 
-        // 3. Create dynamic region map (Label -> ZoneId)
         const regionMap: Record<string, string> = {};
         zones.forEach((z: any) => {
             regionMap[z.label] = z.zoneId;
         });
 
-        // 4. Map markers
         const markers = hits.map((hit: any, index: number) => {
             const source = hit._source;
-            // Default to first zone if not found, or handle gracefully
             const regionId = regionMap[source.location] || (zones[0]?.zoneId || 'unknown');
 
             return {
                 id: `am-${source.id}`,
                 regionId,
-                x: 20 + (index * 10), // scatter them
+                x: 20 + (index * 10),
                 y: 20 + (index * 5),
                 type: source.severity === 'critical' ? 'hotspot' : 'camera',
                 hotspotIcon: source.severity === 'critical' ? 'warning' : undefined,
             };
         });
 
-        // 5. Format regions
         const regions = zones.map((z: any) => ({
             id: z.zoneId,
             label: z.label,
