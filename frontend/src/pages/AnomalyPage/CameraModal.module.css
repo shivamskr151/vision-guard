@@ -1,0 +1,299 @@
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    padding: var(--space-4);
+}
+
+.modalContent {
+    background: var(--color-bg-base);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 1200px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.modalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-6);
+    background: var(--color-bg-card);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+}
+
+.cameraIcon {
+    color: var(--color-text-muted);
+    display: flex;
+    align-items: center;
+}
+
+.titleGroup {
+    display: flex;
+    flex-direction: column;
+}
+
+.title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0;
+}
+
+.subtitle {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    margin: 0;
+}
+
+.headerRight {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+}
+
+.liveBadge {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 4px 12px;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    color: var(--color-success);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    border-radius: 999px;
+    letter-spacing: 0.05em;
+}
+
+.liveDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.anomalyBadge {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 4px 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--color-danger);
+    color: var(--color-danger);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    border-radius: 999px;
+}
+
+.closeButton {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    transition: all var(--transition-fast);
+}
+
+.closeButton:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
+.modalBody {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.videoSection {
+    flex: 2;
+    position: relative;
+    background: #000;
+    min-height: 400px;
+}
+
+.videoFeed {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.8;
+}
+
+.sidebar {
+    flex: 1;
+    background: var(--color-bg-card);
+    border-left: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    max-width: 400px;
+}
+
+.sidebarHeader {
+    padding: var(--space-4) var(--space-6);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sidebarTitle {
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0;
+}
+
+.eventFeed {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.eventCard {
+    background: var(--color-bg-base);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.eventImage {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    opacity: 0.7;
+}
+
+.eventContent {
+    padding: var(--space-3);
+}
+
+.eventHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-2);
+}
+
+.severityBadge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(234, 179, 8, 0.1);
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning);
+}
+
+.severityBadge.critical {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+}
+
+.severityBadge.high {
+    background: rgba(249, 115, 22, 0.1);
+    color: #f97316;
+    border-color: #f97316;
+}
+
+.severityBadge.low {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.timeAgo {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+}
+
+.eventType {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0 0 var(--space-1) 0;
+}
+
+.eventDesc {
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    margin: 0 0 var(--space-3) 0;
+    line-height: 1.4;
+}
+
+.confidenceRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--text-xs);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+}
+
+.confidenceLabel {
+    color: var(--color-text-muted);
+}
+
+.confidenceValue {
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.emptyState {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    text-align: center;
+    padding: var(--space-6) 0;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@media (max-width: 768px) {
+    .modalBody {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        max-width: none;
+        flex: none;
+        height: 300px;
+        border-left: none;
+        border-top: 1px solid var(--color-border);
+    }
+}

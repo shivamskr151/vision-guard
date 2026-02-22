@@ -125,7 +125,7 @@ export function AnomalyPage() {
               Click any camera to expand view
             </p>
             <div className={styles.cameraStreamsScroll} aria-label="Live camera streams list">
-              <LiveCameraStreams cameras={filteredCameras} />
+              <LiveCameraStreams cameras={filteredCameras} events={events} />
             </div>
           </div>
           <div>

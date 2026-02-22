@@ -1,4 +1,6 @@
-import type { CameraStream } from '@/types'
+import type { CameraStream, AnomalyEvent } from '@/types'
+import { useState } from 'react'
+import { CameraModal } from './CameraModal'
 import styles from './LiveCameraStreams.module.css'
 
 function IconCamera() {
@@ -27,11 +29,19 @@ function IconExpand() {
   )
 }
 
-export function LiveCameraStreams({ cameras }: { cameras: CameraStream[] }) {
+export function LiveCameraStreams({ cameras, events }: { cameras: CameraStream[], events: AnomalyEvent[] }) {
+  const [selectedCamera, setSelectedCamera] = useState<CameraStream | null>(null)
+
   return (
     <div className={styles.grid} role="list">
       {cameras.map((cam) => (
-        <article key={cam.id} className={styles.card} role="listitem">
+        <article
+          key={cam.id}
+          className={styles.card}
+          role="listitem"
+          onClick={() => setSelectedCamera(cam)}
+          style={{ cursor: 'pointer' }}
+        >
           <div className={styles.cardHeader}>
             <span className={styles.cardHeaderIcon} aria-hidden>
               <IconCamera />
@@ -40,10 +50,10 @@ export function LiveCameraStreams({ cameras }: { cameras: CameraStream[] }) {
               {cam.name}
             </span>
             <div className={styles.cardHeaderActions}>
-              <button type="button" aria-label="Pause">
+              <button type="button" aria-label="Pause" onClick={(e) => { e.stopPropagation(); /* potentially pause logic here */ }}>
                 <IconPause />
               </button>
-              <button type="button" aria-label="Expand">
+              <button type="button" aria-label="Expand" onClick={(e) => { e.stopPropagation(); setSelectedCamera(cam); }}>
                 <IconExpand />
               </button>
             </div>
@@ -89,6 +99,14 @@ export function LiveCameraStreams({ cameras }: { cameras: CameraStream[] }) {
           )}
         </article>
       ))}
+      {selectedCamera && (
+        <CameraModal
+          isOpen={true}
+          onClose={() => setSelectedCamera(null)}
+          camera={selectedCamera}
+          events={events}
+        />
+      )}
     </div>
   )
 }
