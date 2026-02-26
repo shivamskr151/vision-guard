@@ -15,11 +15,11 @@ import { KafkaConsumerService } from './consumer/kafka.consumer.service';
                     transport: Transport.KAFKA,
                     options: {
                         client: {
-                            clientId: 'vision-guard-producer',
-                            brokers: (configService.get<string>('KAFKA_BROKERS') ?? 'localhost:9092').split(','),
+                            clientId: configService.get<string>('kafka.clientId', 'vision-guard-producer'),
+                            brokers: configService.get<string>('kafka.brokers')!.split(','),
                         },
                         consumer: {
-                            groupId: 'vision-guard-producer-group',
+                            groupId: configService.get<string>('kafka.producerGroup', 'vision-guard-producer-group'),
                         },
                     },
                 }),

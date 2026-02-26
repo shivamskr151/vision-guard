@@ -22,13 +22,13 @@ export class AnomaliesController {
         const { severity, type, asset, camera } = query;
         const must: any[] = [];
 
-        if (severity) must.push({ term: { 'severity.keyword': severity } });
-        if (type) must.push({ term: { 'type.keyword': type } });
-        if (asset) must.push({ term: { 'assetId.keyword': asset } });
+        if (severity) must.push({ term: { severity: severity } });
+        if (type) must.push({ term: { type: type } });
+        if (asset) must.push({ term: { assetId: asset } });
         if (camera) {
             // Frontend sends "Location Cam", backend stores "Location"
             const location = camera.replace(' Cam', '');
-            must.push({ term: { 'location.keyword': location } });
+            must.push({ term: { location: location } });
         }
 
         const result = await this.elasticsearchService.search({
@@ -41,8 +41,8 @@ export class AnomaliesController {
                 aggs: {
                     total: { value_count: { field: 'id' } },
                     critical: { filter: { term: { severity: 'critical' } } },
-                    affected_assets: { cardinality: { field: 'assetId.keyword' } },
-                    affected_cameras: { cardinality: { field: 'location.keyword' } },
+                    affected_assets: { cardinality: { field: 'assetId' } },
+                    affected_cameras: { cardinality: { field: 'location' } },
                 },
             },
         } as any);

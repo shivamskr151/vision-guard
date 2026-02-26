@@ -21,7 +21,9 @@ export class TelemetryService implements OnModuleInit, OnModuleDestroy {
     ) { }
 
     async onModuleInit() {
-        const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+        const nodeEnv = this.configService.get<string>('nodeEnv');
+
+        await this.createIndex();
 
         // Initialize Aggregator for high-frequency telemetry
         this.telemetryAggregator = {
@@ -39,7 +41,7 @@ export class TelemetryService implements OnModuleInit, OnModuleDestroy {
             }
         };
 
-        if (!isProduction) {
+        if (nodeEnv !== 'production') {
             this.startTelemetryStream();
         } else {
             this.logger.log('Production mode: Simulation stream disabled.');
@@ -52,10 +54,10 @@ export class TelemetryService implements OnModuleInit, OnModuleDestroy {
 
     private startTelemetryStream() {
         this.logger.log('Starting Asset Telemetry Stream from CSV...');
-        const dataDir: string = this.configService.get<string>('DATA_DIR') || 'Data';
-        const fileName: string = this.configService.get<string>('TELEMETRY_DATA_FILE') || 'telemetry_data.csv';
+        const dataDir = this.configService.get<string>('simulation.dataDir')!;
+        const fileName = this.configService.get<string>('simulation.files.telemetry')!;
         const csvPath = path.join(process.cwd(), dataDir, fileName);
-        const intervalMs = parseInt(this.configService.get<string>('TELEMETRY_STREAM_INTERVAL') || '2000');
+        const intervalMs = this.configService.get<number>('simulation.intervals.telemetry')!;
 
         setInterval(async () => {
             try {
@@ -78,7 +80,10 @@ export class TelemetryService implements OnModuleInit, OnModuleDestroy {
                 const inspectionCompliance = parseFloat(values[4]);
                 const criticalAssetRiskIndex = parseFloat(values[5]);
 
-                const status = activeAnomalies > 150 ? 'critical' : (activeAnomalies > 100 ? 'warning' : 'normal');
+                const criticalThreshold = this.configService.get<number>('simulation.thresholds.criticalAnomalies')!;
+                const warningThreshold = this.configService.get<number>('simulation.thresholds.warningAnomalies')!;
+
+                const status = activeAnomalies > criticalThreshold ? 'critical' : (activeAnomalies > warningThreshold ? 'warning' : 'normal');
 
                 const payload = {
                     timestamp: new Date().toISOString(),
@@ -100,15 +105,38 @@ export class TelemetryService implements OnModuleInit, OnModuleDestroy {
         }, intervalMs);
     }
 
+    private async createIndex() {
+        const indexExists = await this.elasticsearchService.indices.exists({ index: 'asset_telemetry' });
+        if (!indexExists) {
+            await this.elasticsearchService.indices.create({
+                index: 'asset_telemetry',
+                body: {
+                    mappings: {
+                        properties: {
+                            id: { type: 'keyword' },
+                            timestamp: { type: 'date' },
+                            assetId: { type: 'keyword' },
+                            assetInspection: { type: 'integer' },
+                            assetOverdue: { type: 'integer' },
+                            activeAnomalies: { type: 'integer' },
+                            inspectionCompliance: { type: 'float' },
+                            criticalAssetRiskIndex: { type: 'float' },
+                            status: { type: 'keyword' }
+                        }
+                    }
+                }
+            } as any);
+            this.logger.log('Created asset_telemetry index with mapping');
+        }
+    }
+
     private async flushTelemetry() {
-        if (!this.telemetryAggregator) return;
+        if (!this.telemetryAggregator || this.telemetryAggregator.buffer.length === 0) return;
 
         if (this.telemetryAggregator.timer) {
             clearTimeout(this.telemetryAggregator.timer);
             this.telemetryAggregator.timer = null;
         }
-
-        if (this.telemetryAggregator.buffer.length === 0) return;
 
         const batch = [...this.telemetryAggregator.buffer];
         this.telemetryAggregator.buffer = [];
@@ -123,26 +151,26 @@ export class TelemetryService implements OnModuleInit, OnModuleDestroy {
         // Step 4: Elasticsearch Index (Bulk)
         try {
             const operations = batch.flatMap(record => [
-                { index: { _index: 'asset_telemetry' } },
+                { index: { _index: 'asset_telemetry', _id: record.id } },
                 {
                     id: record.id,
                     timestamp: record.timestamp,
                     assetId: record.assetId,
-                    status: record.status,
                     assetInspection: record.assetInspection,
                     assetOverdue: record.assetOverdue,
                     activeAnomalies: record.activeAnomalies,
                     inspectionCompliance: record.inspectionCompliance,
                     criticalAssetRiskIndex: record.criticalAssetRiskIndex,
+                    status: record.status
                 }
             ]);
 
             this.elasticsearchService.bulk({
                 refresh: false,
                 operations
-            }).catch(err => this.logger.error('Bulk ES Indexing failed', err));
+            }).catch(err => this.logger.error('Bulk Telemetry ES Indexing failed', err));
         } catch (error) {
-            this.logger.error('Error in Bulk ES Indexing', error);
+            this.logger.error('Error in Bulk Telemetry ES Indexing', error);
         }
     }
 

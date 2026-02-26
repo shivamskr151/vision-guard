@@ -5,6 +5,7 @@ import { Transport, MicroserviceOptions } from '@nestjs/microservices';
 import { ValidationPipe } from '@nestjs/common';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { WsAdapter } from '@nestjs/platform-ws';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -27,14 +28,18 @@ async function bootstrap() {
 
   app.useWebSocketAdapter(new WsAdapter(app));
 
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>('port')!;
+  const kafkaBrokers = configService.get<string>('kafka.brokers')!;
+
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.KAFKA,
     options: {
       client: {
-        brokers: [process.env.KAFKA_BROKERS ?? 'localhost:9092'],
+        brokers: [kafkaBrokers],
       },
       consumer: {
-        groupId: 'traffic-consumer-v2',
+        groupId: configService.get<string>('kafka.consumerGroup')!,
       },
       subscribe: {
         fromBeginning: true,
@@ -44,7 +49,7 @@ async function bootstrap() {
 
   await app.startAllMicroservices();
   app.enableCors();
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(port);
 }
 bootstrap();
 

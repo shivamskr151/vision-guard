@@ -27,7 +27,7 @@ Vision Guard is a vision-based asset intelligence platform for monitoring facili
 - **API Architecture:** Hybrid (REST + Kafka Microservices)
 
 ### Infrastructure
-- **Database:** PostgreSQL (via Prisma)
+- **Database:** MongoDB (via Prisma)
 - **Message Broker:** Apache Kafka & Zookeeper
 - **Logging/Analytics:** Elasticsearch & Kibana
 - **Containerization:** Docker & Docker Compose
@@ -40,7 +40,7 @@ Vision Guard is a vision-based asset intelligence platform for monitoring facili
 - **npm:** 9+
 
 ### 2. Infrastructure Setup
-Spin up the required services (PostgreSQL, Kafka, Elasticsearch) using Docker Compose:
+Spin up the required services (MongoDB, Kafka, Elasticsearch) using Docker Compose:
 
 ```bash
 docker-compose up -d
@@ -56,9 +56,9 @@ docker-compose up -d
    npm install
    ```
 3. Configure environment variables in `.env` (refer to `.env.example`).
-4. Run Prisma migrations:
+4. Sync database schema:
    ```bash
-   npx prisma migrate dev
+   npx prisma db push
    ```
 5. Start the backend:
    ```bash

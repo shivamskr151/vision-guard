@@ -2,8 +2,8 @@ import { IsNotEmpty, IsNumber, IsOptional, IsString, IsEnum, IsISO8601 } from 'c
 
 export class CreateInspectionDto {
     @IsNotEmpty()
-    @IsNumber()
-    assetId: number;
+    @IsString()
+    assetId: string;
 
     @IsNotEmpty()
     @IsISO8601()

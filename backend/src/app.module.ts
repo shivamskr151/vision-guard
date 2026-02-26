@@ -1,24 +1,25 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AssetsModule } from './assets/assets.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { InspectionsModule } from './inspections/inspections.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { AnomaliesModule } from './anomalies/anomalies.module';
-import { ElasticsearchModule } from '@nestjs/elasticsearch';
 import { EventsModule } from './events/events.module';
 import { KafkaModule } from './kafka/kafka.module';
+import { SharedElasticsearchModule } from './elasticsearch/elasticsearch.module';
+
+import configuration from './config/configuration';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [configuration],
     }),
-    ElasticsearchModule.register({
-      node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
-    }),
+    SharedElasticsearchModule,
     AssetsModule,
     PrismaModule,
     InspectionsModule,

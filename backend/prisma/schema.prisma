@@ -3,11 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model AnomalyEvent {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   timestamp   DateTime
   severity    String
   type        String
@@ -20,7 +21,7 @@ model AnomalyEvent {
 }
 
 model Asset {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   assetId     String   @unique
   name        String
   type        String
@@ -32,7 +33,8 @@ model Asset {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   inspections Inspection[]
-  assignedTemplates InspectionTemplate[]
+  assignedTemplates InspectionTemplate[] @relation(fields: [assignedTemplateIds], references: [id])
+  assignedTemplateIds String[] @db.ObjectId
   customData  Json?
   lastInspectionDate DateTime?
   inspectionFrequency Int?
@@ -42,7 +44,7 @@ model Asset {
 }
 
 model SchemaLibrary {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   description String
   fieldCount  Int
@@ -54,18 +56,18 @@ model SchemaLibrary {
 }
 
 model CustomField {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   label       String
   type        String
   required    Boolean
   options     String[]
-  schemaId    Int?
+  schemaId    String?  @db.ObjectId
   schema      SchemaLibrary? @relation(fields: [schemaId], references: [id])
   createdAt   DateTime @default(now())
 }
 
 model InspectionTemplate {
-  id              Int      @id @default(autoincrement())
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
   title           String
   description     String
   questionCount   Int
@@ -78,20 +80,21 @@ model InspectionTemplate {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   checklist       InspectionChecklist[]
-  assets          Asset[]
+  assets          Asset[]  @relation(fields: [assetIds], references: [id])
+  assetIds        String[] @db.ObjectId
 }
 
 model InspectionChecklist {
-  id                Int      @id @default(autoincrement())
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
   text              String
   mandatory         Boolean
   passFailCondition Boolean
-  templateId        Int
+  templateId        String   @db.ObjectId
   template          InspectionTemplate @relation(fields: [templateId], references: [id])
 }
 
 model Inspection {
-  id              Int      @id @default(autoincrement())
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
   assetId         String
   asset           Asset    @relation(fields: [assetId], references: [assetId])
   inspectorId     String?
@@ -109,7 +112,7 @@ model Inspection {
 }
 
 model Zone {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   zoneId      String   @unique
   label       String
   x           Float
@@ -121,7 +124,7 @@ model Zone {
 }
 
 model AssetTelemetry {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   timestamp   DateTime
   assetId     String
   asset       Asset    @relation(fields: [assetId], references: [assetId])

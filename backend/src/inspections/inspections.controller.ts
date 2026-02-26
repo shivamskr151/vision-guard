@@ -57,16 +57,16 @@ export class InspectionsController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.inspectionsService.findOne(+id);
+    return this.inspectionsService.findOne(id);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateInspectionDto: UpdateInspectionDto) {
-    return this.inspectionsService.update(+id, updateInspectionDto);
+    return this.inspectionsService.update(id, updateInspectionDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.inspectionsService.remove(+id);
+    return this.inspectionsService.remove(id);
   }
 }

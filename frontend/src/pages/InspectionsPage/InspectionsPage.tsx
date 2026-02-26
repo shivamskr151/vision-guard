@@ -214,7 +214,7 @@ export const InspectionsPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          assetId: parseInt(formData.assetId),
+          assetId: formData.assetId,
           scheduledDate: formData.scheduledDate,
           type: formData.type,
           status: 'scheduled'

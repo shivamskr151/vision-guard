@@ -10,13 +10,6 @@ import { EventsModule } from '../events/events.module';
 @Module({
   imports: [
     PrismaModule,
-    ElasticsearchModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        node: configService.get<string>('ELASTICSEARCH_NODE'),
-      }),
-      inject: [ConfigService],
-    }),
     EventsModule,
   ],
   controllers: [InspectionsController],

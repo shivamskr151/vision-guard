@@ -1,11 +1,8 @@
-
 import { PrismaClient } from '@prisma/client';
 import { Client } from '@elastic/elasticsearch';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
 
 // Try to load .env if available
 const envPath = path.join(__dirname, '.env');
@@ -13,10 +10,7 @@ if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
 }
 
-const connectionString = `${process.env.DATABASE_URL}`;
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 const esNode = process.env.ELASTICSEARCH_NODE || 'http://localhost:9200';
 const esClient = new Client({
@@ -26,10 +20,9 @@ const esClient = new Client({
 async function main() {
     console.log('Starting full database cleanup...');
 
-    // 1. Clean PostgreSQL
-    console.log('Cleaning PostgreSQL tables...');
+    // 1. Clean MongoDB
+    console.log('Cleaning MongoDB collections...');
 
-    // Using transaction for consistency
     try {
         await prisma.$transaction([
             prisma.assetTelemetry.deleteMany(),
@@ -37,16 +30,31 @@ async function main() {
             prisma.inspection.deleteMany(),
             prisma.anomalyEvent.deleteMany(),
             prisma.customField.deleteMany(),
-            // prisma.assignedTemplates... handled by Asset delete? Explicitly implicit tables are not exposed directly usually
             prisma.asset.deleteMany(),
             prisma.inspectionTemplate.deleteMany(),
             prisma.schemaLibrary.deleteMany(),
             prisma.zone.deleteMany(),
         ]);
 
-        console.log('PostgreSQL cleaned successfully.');
+        console.log('MongoDB cleaned successfully.');
     } catch (error) {
-        console.error('Error cleaning PostgreSQL:', error);
+        console.error('Error cleaning MongoDB:', error);
+        // If transaction fails (e.g. not a replica set), try sequential
+        console.log('Attempting sequential cleanup...');
+        try {
+            await prisma.assetTelemetry.deleteMany();
+            await prisma.inspectionChecklist.deleteMany();
+            await prisma.inspection.deleteMany();
+            await prisma.anomalyEvent.deleteMany();
+            await prisma.customField.deleteMany();
+            await prisma.asset.deleteMany();
+            await prisma.inspectionTemplate.deleteMany();
+            await prisma.schemaLibrary.deleteMany();
+            await prisma.zone.deleteMany();
+            console.log('Sequential MongoDB cleanup successful.');
+        } catch (seqError) {
+            console.error('Sequential cleanup also failed:', seqError);
+        }
     }
 
     // 2. Clean ElasticSearch
@@ -77,5 +85,4 @@ main()
     })
     .finally(async () => {
         await prisma.$disconnect();
-        // pool.end(); // Adapter handles closing?
     });

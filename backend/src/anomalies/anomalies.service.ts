@@ -22,7 +22,9 @@ export class AnomaliesService implements OnModuleInit, OnModuleDestroy {
     ) { }
 
     async onModuleInit() {
-        const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+        const nodeEnv = this.configService.get<string>('nodeEnv');
+
+        await this.createIndex();
 
         // Initialize Aggregator for anomalies
         this.anomalyAggregator = {
@@ -40,7 +42,7 @@ export class AnomaliesService implements OnModuleInit, OnModuleDestroy {
             }
         };
 
-        if (!isProduction) {
+        if (nodeEnv !== 'production') {
             this.startSimulation();
         } else {
             this.logger.log('Production mode: Simulation stream disabled.');
@@ -53,10 +55,10 @@ export class AnomaliesService implements OnModuleInit, OnModuleDestroy {
 
     private startSimulation() {
         this.logger.log('Starting Anomaly Simulation from CSV...');
-        const dataDir: string = this.configService.get<string>('DATA_DIR') || 'Data';
-        const fileName: string = this.configService.get<string>('ANOMALY_DATA_FILE') || 'anomaly_data.csv';
+        const dataDir = this.configService.get<string>('simulation.dataDir')!;
+        const fileName = this.configService.get<string>('simulation.files.anomaly')!;
         const csvPath = path.join(process.cwd(), dataDir, fileName);
-        const intervalMs = parseInt(this.configService.get<string>('ANOMALY_STREAM_INTERVAL') || '10000');
+        const intervalMs = this.configService.get<number>('simulation.intervals.anomaly')!;
 
         setInterval(async () => {
             try {
@@ -98,6 +100,30 @@ export class AnomaliesService implements OnModuleInit, OnModuleDestroy {
         }, intervalMs);
     }
 
+    private async createIndex() {
+        const indexExists = await this.elasticsearchService.indices.exists({ index: 'anomaly_events' });
+        if (!indexExists) {
+            await this.elasticsearchService.indices.create({
+                index: 'anomaly_events',
+                body: {
+                    mappings: {
+                        properties: {
+                            id: { type: 'keyword' },
+                            timestamp: { type: 'date' },
+                            severity: { type: 'keyword' },
+                            type: { type: 'keyword' },
+                            assetId: { type: 'keyword' },
+                            location: { type: 'keyword' },
+                            confidence: { type: 'float' },
+                            isResolved: { type: 'boolean' }
+                        }
+                    }
+                }
+            } as any);
+            this.logger.log('Created anomaly_events index with mapping');
+        }
+    }
+
     private async flushAnomalies() {
         if (!this.anomalyAggregator || this.anomalyAggregator.buffer.length === 0) return;
 
@@ -119,7 +145,7 @@ export class AnomaliesService implements OnModuleInit, OnModuleDestroy {
         // Step 4: Elasticsearch Index (Bulk)
         try {
             const operations = batch.flatMap(record => [
-                { index: { _index: 'anomaly_events' } },
+                { index: { _index: 'anomaly_events', _id: record.id } },
                 {
                     id: record.id,
                     timestamp: record.timestamp,

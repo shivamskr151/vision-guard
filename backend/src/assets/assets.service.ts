@@ -21,14 +21,15 @@ export class AssetsService implements OnModuleInit {
     ) { }
 
     async onModuleInit() {
+        await this.createIndex();
         this.startZoneStream();
         this.startAssetStream();
     }
 
     private startZoneStream() {
         this.logger.log('Starting Zone Stream from CSV...');
-        const dataDir: string = this.configService.get<string>('DATA_DIR') || 'Data';
-        const fileName: string = this.configService.get<string>('ZONE_UPDATES_FILE') || 'zone_updates.csv';
+        const dataDir = this.configService.get<string>('simulation.dataDir')!;
+        const fileName = this.configService.get<string>('simulation.files.zone')!;
         const csvPath = path.join(process.cwd(), dataDir, fileName);
 
         if (!fs.existsSync(csvPath)) {
@@ -60,8 +61,8 @@ export class AssetsService implements OnModuleInit {
 
     private startAssetStream() {
         this.logger.log('Starting Asset Stream from CSV...');
-        const dataDir: string = this.configService.get<string>('DATA_DIR') || 'Data';
-        const fileName: string = this.configService.get<string>('ASSET_UPDATES_FILE') || 'asset_updates.csv';
+        const dataDir = this.configService.get<string>('simulation.dataDir')!;
+        const fileName = this.configService.get<string>('simulation.files.asset')!;
         const csvPath = path.join(process.cwd(), dataDir, fileName);
 
         if (!fs.existsSync(csvPath)) {
@@ -85,7 +86,7 @@ export class AssetsService implements OnModuleInit {
 
         this.logger.log(`Emitted initial burst of ${uniqueAssets.size} assets.`);
 
-        const intervalMs = parseInt(this.configService.get<string>('ASSET_STREAM_INTERVAL') || '3000');
+        const intervalMs = this.configService.get<number>('simulation.intervals.asset')!;
         setInterval(async () => {
             try {
                 // Skip header, pick random line to simulate continuous updates
@@ -144,7 +145,7 @@ export class AssetsService implements OnModuleInit {
         const createData: Prisma.AssetCreateInput = {
             ...rest,
             assignedTemplates: assignedTemplates && assignedTemplates.length > 0 ? {
-                connect: assignedTemplates.map((id: string) => ({ id: Number(id) }))
+                connect: assignedTemplates.map((id: string) => ({ id }))
             } : undefined
         };
 
@@ -160,7 +161,7 @@ export class AssetsService implements OnModuleInit {
         }, { page, limit });
     }
 
-    async update(id: number, data: Prisma.AssetUpdateInput) {
+    async update(id: string, data: Prisma.AssetUpdateInput) {
         const { assignedTemplates, ...rest } = data as any;
 
         const updateData: any = {
@@ -169,12 +170,12 @@ export class AssetsService implements OnModuleInit {
 
         if (assignedTemplates) {
             updateData.assignedTemplates = {
-                set: assignedTemplates.map((id: string) => ({ id: Number(id) }))
+                set: assignedTemplates.map((id: string) => ({ id }))
             };
         }
 
         return this.prisma.asset.update({
-            where: { id },
+            where: { id: id as any },
             data: updateData,
             include: { assignedTemplates: true } as any
         });
@@ -209,6 +210,33 @@ export class AssetsService implements OnModuleInit {
 
         } catch (error) {
             this.logger.error(`Failed to update zone ${data.zoneId}:`, error);
+        }
+    }
+
+    private async createIndex() {
+        const indexExists = await this.elasticsearchService.indices.exists({ index: 'assets' });
+        if (!indexExists) {
+            await this.elasticsearchService.indices.create({
+                index: 'assets',
+                body: {
+                    mappings: {
+                        properties: {
+                            id: { type: 'keyword' },
+                            assetId: { type: 'keyword' },
+                            name: { type: 'text' },
+                            type: { type: 'keyword' },
+                            zone: { type: 'keyword' },
+                            healthStatus: { type: 'keyword' },
+                            linkedCameras: { type: 'integer' },
+                            criticality: { type: 'integer' },
+                            x: { type: 'float' },
+                            y: { type: 'float' },
+                            updatedAt: { type: 'date' }
+                        }
+                    }
+                }
+            } as any);
+            this.logger.log('Created assets index with mapping');
         }
     }
 
@@ -252,7 +280,7 @@ export class AssetsService implements OnModuleInit {
             this.logger.log(`Saved asset to DB: ${asset.assetId}`);
 
             // Step 3: WebSocket (UI Update)
-            this.eventsGateway.broadcast('asset_update', asset);
+            this.eventsGateway.broadcast('asset_update', asset as any);
 
             // Step 4: Elasticsearch Index (Async)
             this.elasticsearchService.index({
@@ -260,7 +288,7 @@ export class AssetsService implements OnModuleInit {
                 id: asset.assetId,
                 document: {
                     id: asset.id,
-                    assetId: asset.assetId,
+                    assetId: asset.assetId as string,
                     name: asset.name,
                     type: asset.type,
                     zone: asset.zone,
@@ -279,7 +307,7 @@ export class AssetsService implements OnModuleInit {
     }
 
 
-    async remove(id: number) {
+    async remove(id: string) {
         const asset = await this.prisma.asset.findUnique({ where: { id } });
         if (asset) {
             // Delete related inspections first

@@ -8,14 +8,6 @@ import { ElasticsearchModule } from '@nestjs/elasticsearch';
 @Module({
   imports: [
     PrismaModule,
-    ElasticsearchModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        node: configService.get<string>('ELASTICSEARCH_NODE'),
-      }),
-      inject: [ConfigService],
-    }),
-
   ],
   controllers: [AnomaliesController],
   providers: [AnomaliesService],

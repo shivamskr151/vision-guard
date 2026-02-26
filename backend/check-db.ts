@@ -1,17 +1,11 @@
-
 import { PrismaClient } from '@prisma/client';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
 // Load .env
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-const connectionString = `${process.env.DATABASE_URL}`;
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 async function main() {
     try {
@@ -28,7 +22,6 @@ async function main() {
         console.error('Error querying DB:', error);
     } finally {
         await prisma.$disconnect();
-        await pool.end();
     }
 }
 

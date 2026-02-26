@@ -26,8 +26,7 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
   ) { }
 
   async onModuleInit() {
-    this.createIndex();
-    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const nodeEnv = this.configService.get<string>('nodeEnv');
 
     // Initialize Aggregator for inspections
     this.inspectionAggregator = {
@@ -45,7 +44,9 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
       }
     };
 
-    if (!isProduction) {
+    await this.createIndex();
+
+    if (nodeEnv !== 'production') {
       this.startInspectionStream();
     } else {
       this.logger.log('Production mode: Simulation stream disabled.');
@@ -58,10 +59,10 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
 
   private startInspectionStream() {
     this.logger.log('Starting Inspection Stream from CSV...');
-    const dataDir: string = this.configService.get<string>('DATA_DIR') || 'Data';
-    const fileName: string = this.configService.get<string>('INSPECTION_UPDATES_FILE') || 'inspection_updates.csv';
+    const dataDir = this.configService.get<string>('simulation.dataDir')!;
+    const fileName = this.configService.get<string>('simulation.files.inspection')!;
     const csvPath = path.join(process.cwd(), dataDir, fileName);
-    const intervalMs = parseInt(this.configService.get<string>('INSPECTION_STREAM_INTERVAL') || '3000');
+    const intervalMs = this.configService.get<number>('simulation.intervals.inspection')!;
 
     setInterval(async () => {
       try {
@@ -111,7 +112,7 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
         body: {
           mappings: {
             properties: {
-              id: { type: 'integer' },
+              id: { type: 'keyword' },
               assetId: { type: 'keyword' },
               status: { type: 'keyword' },
               result: { type: 'keyword' },
@@ -614,9 +615,9 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
 
   async create(createInspectionDto: CreateInspectionDto) {
     const { assetId, scheduledDate, type, status } = createInspectionDto;
-    const asset = await this.prisma.asset.findUnique({ where: { id: +assetId } });
+    const asset = await this.prisma.asset.findUnique({ where: { assetId } });
     if (!asset) {
-      throw new Error(`Asset with ID ${assetId} not found`);
+      throw new Error(`Asset with logical ID ${assetId} not found`);
     }
 
     const newInspection = await this.prisma.inspection.create({
@@ -639,17 +640,17 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: string) {
     return this.prisma.inspection.findUnique({
-      where: { id },
+      where: { id: id as any },
       include: { asset: true }
     });
   }
 
-  async update(id: number, updateInspectionDto: UpdateInspectionDto) {
+  async update(id: string, updateInspectionDto: UpdateInspectionDto) {
     const { assetId, ...data } = updateInspectionDto;
     const inspection = await this.prisma.inspection.update({
-      where: { id },
+      where: { id: id as any },
       data: {
         ...data,
         scheduledDate: data.scheduledDate ? new Date(data.scheduledDate) : undefined,
@@ -674,12 +675,12 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
     return { message: `Synced ${inspections.length} inspections` };
   }
 
-  async remove(id: number) {
+  async remove(id: string) {
     const inspection = await this.prisma.inspection.findUnique({ where: { id } });
     if (inspection) {
       await this.elasticsearchService.delete({
         index: 'inspections',
-        id: id.toString()
+        id: id
       });
     }
     return this.prisma.inspection.delete({ where: { id } });
