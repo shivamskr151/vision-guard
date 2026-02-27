@@ -9,6 +9,7 @@ export function useAnomalyData(filters?: Record<string, string>) {
     const [mapMarkers, setMapMarkers] = useState<AnomalyMapMarker[]>([]);
     const [mapRegions, setMapRegions] = useState<MapRegion[]>([]);
     const [cameraStreams, setCameraStreams] = useState<CameraStream[]>([]);
+    const [filterOptions, setFilterOptions] = useState<any>({ severities: [], types: [], assets: [], cameras: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -16,14 +17,15 @@ export function useAnomalyData(filters?: Record<string, string>) {
         const fetchData = async () => {
             try {
                 const queryParams = new URLSearchParams(filters as any).toString();
-                const [statsRes, eventsRes, mapRes, camerasRes] = await Promise.all([
+                const [statsRes, eventsRes, mapRes, camerasRes, optionsRes] = await Promise.all([
                     fetch(`${config.API_URL}/anomalies/stats?${queryParams}`),
-                    fetch(`${config.API_URL}/anomalies/events`),
+                    fetch(`${config.API_URL}/anomalies/events?${queryParams}`),
                     fetch(`${config.API_URL}/anomalies/map`),
                     fetch(`${config.API_URL}/anomalies/cameras`),
+                    fetch(`${config.API_URL}/anomalies/filter-options`),
                 ]);
 
-                if (!statsRes.ok || !eventsRes.ok || !mapRes.ok || !camerasRes.ok) {
+                if (!statsRes.ok || !eventsRes.ok || !mapRes.ok || !camerasRes.ok || !optionsRes.ok) {
                     throw new Error('Failed to fetch anomaly data');
                 }
 
@@ -31,12 +33,14 @@ export function useAnomalyData(filters?: Record<string, string>) {
                 const eventsData = await eventsRes.json();
                 const mapData = await mapRes.json();
                 const camerasData = await camerasRes.json();
+                const optionsData = await optionsRes.json();
 
                 setKpiCards(statsData);
                 setEvents(eventsData);
                 setMapMarkers(mapData.markers || []);
                 setMapRegions(mapData.regions || []);
                 setCameraStreams(camerasData);
+                setFilterOptions(optionsData);
                 setLoading(false);
             } catch (err) {
                 console.error('Error fetching anomaly data:', err);
@@ -99,5 +103,5 @@ export function useAnomalyData(filters?: Record<string, string>) {
 
     }, [lastAnomaly]);
 
-    return { kpiCards, events, mapMarkers, mapRegions, cameraStreams, loading, error };
+    return { kpiCards, events, mapMarkers, mapRegions, cameraStreams, filterOptions, loading, error };
 }

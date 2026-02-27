@@ -27,7 +27,7 @@ export function AnomalyPage() {
   })
 
   // Pass filters to hook for server-side aggregation
-  const { kpiCards, events, mapMarkers, mapRegions, cameraStreams, loading, error } = useAnomalyData(filters)
+  const { kpiCards, events, mapMarkers, mapRegions, cameraStreams, filterOptions, loading, error } = useAnomalyData(filters)
   // Filter Logic
   const filteredEvents = events.filter(e => {
     if (filters.severity && e.severity !== filters.severity) return false
@@ -54,7 +54,7 @@ export function AnomalyPage() {
   })
 
   // Derived counts
-  const activeEventsCount = filteredEvents.length.toString()
+  const activeEventsCount = kpiCards.find(c => c.id === 'total')?.value || '0'
   const liveCamerasCount = filteredCameras.filter(c => c.isLive).length
 
   // Filter map markers to only show those related to filtered events (or all cameras if no event filter)
@@ -100,12 +100,12 @@ export function AnomalyPage() {
             </div>
             <div className={styles.statusItem}>
               <span style={{ fontSize: '12px', color: '#666' }}>
-                (Displaying {filteredEvents.length} of {events.length})
+                (Displaying {filteredEvents.length} of {activeEventsCount})
               </span>
             </div>
           </div>
         </div>
-        <AnomalyFilters events={events} filters={filters} onFilterChange={handleFilterChange} />
+        <AnomalyFilters events={events} filters={filters} onFilterChange={handleFilterChange} filterOptions={filterOptions} />
       </header>
 
       <section className={styles.section} aria-labelledby="anomaly-dashboard-title">

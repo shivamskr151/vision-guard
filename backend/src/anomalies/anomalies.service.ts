@@ -79,9 +79,10 @@ export class AnomaliesService implements OnModuleInit, OnModuleDestroy {
                 const description = values[3];
                 const location = values[4];
                 const confidence = values[5];
+                const timestamp = values[6];
 
                 const payload = {
-                    timestamp: new Date().toISOString(),
+                    timestamp: timestamp || new Date().toISOString(),
                     severity,
                     type,
                     description,
@@ -259,5 +260,12 @@ export class AnomaliesService implements OnModuleInit, OnModuleDestroy {
         }));
 
         return { regions, markers };
+    }
+
+    async getAllAssetIds() {
+        const assets = await this.prisma.asset.findMany({
+            select: { assetId: true }
+        });
+        return assets.map(a => a.assetId);
     }
 }

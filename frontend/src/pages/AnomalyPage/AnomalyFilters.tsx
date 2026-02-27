@@ -11,6 +11,12 @@ function IconFilter() {
 
 interface AnomalyFiltersProps {
   events: AnomalyEvent[]
+  filterOptions: {
+    severities: string[]
+    types: string[]
+    assets: string[]
+    cameras: string[]
+  }
   filters: {
     severity: string
     type: string
@@ -21,12 +27,12 @@ interface AnomalyFiltersProps {
   onFilterChange: (key: string, value: string) => void
 }
 
-export function AnomalyFilters({ events, filters, onFilterChange }: AnomalyFiltersProps) {
-  // Derive unique values for filters
-  const severities = Array.from(new Set(events.map(e => e.severity))).sort()
-  const types = Array.from(new Set(events.map(e => e.type))).sort()
-  const assets = Array.from(new Set(events.map(e => e.asset))).sort()
-  const cameras = Array.from(new Set(events.map(e => e.camera))).sort()
+export function AnomalyFilters({ filters, onFilterChange, filterOptions }: AnomalyFiltersProps) {
+  // Use filter options supplied by backend
+  const severities = filterOptions.severities.sort()
+  const types = filterOptions.types.sort()
+  const assets = filterOptions.assets.sort()
+  const cameras = filterOptions.cameras.sort()
 
   return (
     <div className={styles.filtersRow} role="group" aria-label="Anomaly filters">

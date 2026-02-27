@@ -59,11 +59,28 @@ export class AnomaliesController {
     }
 
     @Get('events')
-    async getEvents() {
+    async getEvents(@Query() query: any) {
+        const { severity, type, asset, camera } = query;
+        const must: any[] = [];
+
+        if (severity) must.push({ term: { severity: severity } });
+        if (type) must.push({ term: { type: type } });
+        if (asset) must.push({ term: { assetId: asset } });
+        if (camera) {
+            const location = camera.replace(' Cam', '');
+            must.push({ term: { location: location } });
+        }
+
+        const body: any = {};
+        if (must.length > 0) {
+            body.query = { bool: { must } };
+        }
+
         const result = await this.elasticsearchService.search({
             index: 'anomaly_events',
             sort: [{ timestamp: 'desc' }],
-            size: 10,
+            size: 50,
+            body: Object.keys(body).length > 0 ? body : undefined
         });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,6 +100,38 @@ export class AnomaliesController {
     @Get('map')
     async getMap() {
         return this.anomaliesService.getMapData();
+    }
+
+    @Get('filter-options')
+    async getFilterOptions() {
+        const result = await this.elasticsearchService.search({
+            index: 'anomaly_events',
+            size: 0,
+            body: {
+                aggs: {
+                    severities: { terms: { field: 'severity', size: 100 } },
+                    types: { terms: { field: 'type', size: 100 } },
+                    assets: { terms: { field: 'assetId', size: 100 } },
+                    cameras: { terms: { field: 'location', size: 100 } }
+                }
+            }
+        } as any);
+
+        const allAssetIds = await this.anomaliesService.getAllAssetIds();
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const aggs: any = (result as any).aggregations;
+
+        // Merge assets from anomalies and from DB source of truth
+        const anomalyAssets = aggs.assets.buckets.map((b: any) => b.key);
+        const mergedAssets = Array.from(new Set([...allAssetIds, ...anomalyAssets]));
+
+        return {
+            severities: aggs.severities.buckets.map((b: any) => b.key),
+            types: aggs.types.buckets.map((b: any) => b.key),
+            assets: mergedAssets,
+            cameras: aggs.cameras.buckets.map((b: any) => `${b.key} Cam`)
+        };
     }
 
     @Get('cameras')

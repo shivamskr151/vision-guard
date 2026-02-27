@@ -9,6 +9,7 @@ import { Server, WebSocket } from 'ws';
 import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
+    path: '/vision-guard',
     cors: {
         origin: '*', // Allow all origins for dev simplicity
     },

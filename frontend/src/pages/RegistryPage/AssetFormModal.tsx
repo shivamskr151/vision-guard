@@ -161,6 +161,15 @@ export function AssetFormModal({ isOpen, onClose, onSave, initialData, assetType
                                     onChange={(e) => setFormData({ ...formData, criticality: parseInt(e.target.value) || 1 })}
                                 />
                             </div>
+                            <div className={styles.formGroup}>
+                                <label>Linked Cameras</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={formData.linkedCameras}
+                                    onChange={(e) => setFormData({ ...formData, linkedCameras: parseInt(e.target.value) || 0 })}
+                                />
+                            </div>
                         </div>
 
                         <div className={styles.formRow}>

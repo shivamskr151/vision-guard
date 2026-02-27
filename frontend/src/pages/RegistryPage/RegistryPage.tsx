@@ -548,6 +548,7 @@ export function RegistryPage() {
   const [inspectionChecklist, setInspectionChecklist] = useState<InspectionChecklistItem[]>(INSPECTION_CHECKLIST_INITIAL)
   const [schemas, setSchemas] = useState<SchemaLibraryItem[]>([])
   const [templates, setTemplates] = useState<InspectionTemplateItem[]>([])
+  const [cameras, setCameras] = useState<any[]>([])
 
   const {
     data: assets,
@@ -583,6 +584,12 @@ export function RegistryPage() {
     // Pre-fetch Schemas and Templates for the "Create Asset" modal
     fetch(`${config.API_URL}/assets/schemas`).then(res => res.json()).then(setSchemas).catch(console.error)
     fetch(`${config.API_URL}/assets/templates`).then(res => res.json()).then(setTemplates).catch(console.error)
+
+    // Fetch cameras to compute linkedCameras accurately based on actual linked cameras
+    fetch(`${config.API_URL}/anomalies/cameras`)
+      .then(res => res.json())
+      .then((data: any[]) => setCameras(data))
+      .catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -703,7 +710,13 @@ export function RegistryPage() {
             {loading && assets.length === 0 ? <div>Loading assets...</div> : (
               <>
                 <AssetListTable
-                  assets={assets}
+                  assets={assets.map(asset => {
+                    const cameraCount = cameras.filter(c => c.assetName === asset.assetId).length;
+                    return {
+                      ...asset,
+                      linkedCameras: cameraCount > 0 ? cameraCount : asset.linkedCameras
+                    };
+                  })}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                 />
