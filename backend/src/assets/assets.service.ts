@@ -2,7 +2,6 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
-import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -15,110 +14,15 @@ export class AssetsService implements OnModuleInit {
     constructor(
         private prisma: PrismaService,
         private elasticsearchService: ElasticsearchService,
-        private kafkaProducerService: KafkaProducerService,
         private configService: ConfigService,
         private eventsGateway: EventsGateway
     ) { }
 
     async onModuleInit() {
         await this.createIndex();
-        this.startZoneStream();
-        this.startAssetStream();
     }
 
-    private startZoneStream() {
-        this.logger.log('Starting Zone Stream from CSV...');
-        const dataDir = this.configService.get<string>('simulation.dataDir')!;
-        const fileName = this.configService.get<string>('simulation.files.zone')!;
-        const csvPath = path.join(process.cwd(), dataDir, fileName);
 
-        if (!fs.existsSync(csvPath)) {
-            this.logger.warn(`CSV file not found at ${csvPath}`);
-            return;
-        }
-
-        const fileContent = fs.readFileSync(csvPath, 'utf-8');
-        const lines = fileContent.split('\n').filter((line) => line.trim() !== '');
-
-        // Emit all zones on startup
-        lines.slice(1).forEach(line => { // Skip header
-            const values = line.split(',');
-            if (values.length >= 6) {
-                const payload = {
-                    timestamp: new Date().toISOString(),
-                    zoneId: values[0],
-                    label: values[1],
-                    x: parseFloat(values[2]),
-                    y: parseFloat(values[3]),
-                    width: parseFloat(values[4]),
-                    height: parseFloat(values[5]),
-                };
-                this.kafkaProducerService.emit('zone_updates', payload);
-                this.logger.verbose(`Emitted zone update for ${payload.zoneId}`);
-            }
-        });
-    }
-
-    private startAssetStream() {
-        this.logger.log('Starting Asset Stream from CSV...');
-        const dataDir = this.configService.get<string>('simulation.dataDir')!;
-        const fileName = this.configService.get<string>('simulation.files.asset')!;
-        const csvPath = path.join(process.cwd(), dataDir, fileName);
-
-        if (!fs.existsSync(csvPath)) {
-            this.logger.warn(`CSV file not found at ${csvPath}`);
-            return;
-        }
-
-        const fileContent = fs.readFileSync(csvPath, 'utf-8');
-        const lines = fileContent.split('\n').filter((line) => line.trim() !== '');
-
-        // Initial burst: Emit all unique assets to populate DB quickly
-        const uniqueAssets = new Set();
-        lines.slice(1).forEach(line => { // Skip header
-            const values = line.split(',');
-            const assetId = values[0];
-            if (!uniqueAssets.has(assetId)) {
-                uniqueAssets.add(assetId);
-                this.emitAssetUpdate(values);
-            }
-        });
-
-        this.logger.log(`Emitted initial burst of ${uniqueAssets.size} assets.`);
-
-        const intervalMs = this.configService.get<number>('simulation.intervals.asset')!;
-        setInterval(async () => {
-            try {
-                // Skip header, pick random line to simulate continuous updates
-                const randomLine = lines[Math.floor(Math.random() * (lines.length - 1)) + 1];
-                const values = randomLine.split(',');
-                this.emitAssetUpdate(values);
-            } catch (error) {
-                this.logger.error('Error in asset stream', error);
-            }
-        }, intervalMs);
-    }
-
-    private emitAssetUpdate(values: string[]) {
-        const payload = {
-            timestamp: new Date().toISOString(),
-            assetId: values[0],
-            name: values[1],
-            type: values[2],
-            zone: values[3],
-            healthStatus: values[4],
-            linkedCameras: parseInt(values[5]),
-            criticality: parseInt(values[6]),
-            criticalityMax: parseInt(values[7]),
-            x: parseFloat(values[8]),
-            y: parseFloat(values[9]),
-            lastInspectionDate: values[10],
-            inspectionFrequency: parseInt(values[11]),
-        };
-
-        this.kafkaProducerService.emit('asset_updates', payload);
-        this.logger.verbose(`Emitted asset update for ${payload.assetId}`);
-    }
 
     async create(data: Prisma.AssetCreateInput) {
         // assignedTemplates needs to be handled via 'connect' or 'connectOrCreate'

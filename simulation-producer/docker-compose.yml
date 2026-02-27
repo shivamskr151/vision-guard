@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  producer:
+    build: .
+    container_name: simulation-producer
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka:9092}
+    networks:
+      - vision_guard_net
+    restart: always
+
+networks:
+  vision_guard_net:
+    external: true
+    name: vision_guard_net

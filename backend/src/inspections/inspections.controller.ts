@@ -13,6 +13,7 @@ export class InspectionsController {
 
   @EventPattern('inspection_updates')
   async handleInspectionUpdate(@Payload() data: any) {
+    console.log('[Kafka] Received Inspection Update:', JSON.stringify(data, null, 2));
     await this.inspectionsService.processInspectionUpdate(data);
   }
 

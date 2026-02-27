@@ -58,8 +58,7 @@ export function useDashboardData() {
                         variant: 'compliance',
                         title: 'Inspection Compliance',
                         value: `${kpi.sla || 0}%`,
-                        description: 'vs last month',
-                        trend: { value: '↑ 5.2%', positive: true } // Mock trend for match
+                        description: 'vs last month'
                     },
                     {
                         id: 'risk',

@@ -1,7 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { EventsGateway } from '../events/events.gateway';
@@ -13,7 +12,6 @@ export class TelemetryService implements OnModuleInit, OnModuleDestroy {
     private telemetryAggregator: any;
 
     constructor(
-        private readonly kafkaProducerService: KafkaProducerService,
         private readonly prisma: PrismaService,
         private readonly elasticsearchService: ElasticsearchService,
         private readonly eventsGateway: EventsGateway,
@@ -41,69 +39,14 @@ export class TelemetryService implements OnModuleInit, OnModuleDestroy {
             }
         };
 
-        if (nodeEnv !== 'production') {
-            this.startTelemetryStream();
-        } else {
-            this.logger.log('Production mode: Simulation stream disabled.');
-        }
+        // Simulation stream is now handled by an external producer service.
     }
 
     async onModuleDestroy() {
         await this.flushTelemetry();
     }
 
-    private startTelemetryStream() {
-        this.logger.log('Starting Asset Telemetry Stream from CSV...');
-        const dataDir = this.configService.get<string>('simulation.dataDir')!;
-        const fileName = this.configService.get<string>('simulation.files.telemetry')!;
-        const csvPath = path.join(process.cwd(), dataDir, fileName);
-        const intervalMs = this.configService.get<number>('simulation.intervals.telemetry')!;
 
-        setInterval(async () => {
-            try {
-                if (!fs.existsSync(csvPath)) {
-                    this.logger.warn(`CSV file not found at ${csvPath}`);
-                    return;
-                }
-
-                const fileContent = fs.readFileSync(csvPath, 'utf-8');
-                const lines = fileContent.split('\n').filter(line => line.trim() !== '');
-
-                // Skip header, pick random line or iterate
-                const randomLine = lines[Math.floor(Math.random() * (lines.length - 1)) + 1];
-                const values = randomLine.split(',');
-
-                const assetId = values[0];
-                const assetInspection = parseInt(values[1]);
-                const assetOverdue = parseInt(values[2]);
-                const activeAnomalies = parseInt(values[3]);
-                const inspectionCompliance = parseFloat(values[4]);
-                const criticalAssetRiskIndex = parseFloat(values[5]);
-
-                const criticalThreshold = this.configService.get<number>('simulation.thresholds.criticalAnomalies')!;
-                const warningThreshold = this.configService.get<number>('simulation.thresholds.warningAnomalies')!;
-
-                const status = activeAnomalies > criticalThreshold ? 'critical' : (activeAnomalies > warningThreshold ? 'warning' : 'normal');
-
-                const payload = {
-                    timestamp: new Date().toISOString(),
-                    assetId,
-                    assetInspection,
-                    assetOverdue,
-                    activeAnomalies,
-                    inspectionCompliance,
-                    criticalAssetRiskIndex,
-                    status
-                };
-
-                this.kafkaProducerService.emit('asset_telemetry', payload);
-                this.logger.verbose(`Emitted CSV telemetry for ${assetId}`);
-
-            } catch (error) {
-                this.logger.error('Error in telemetry stream', error);
-            }
-        }, intervalMs);
-    }
 
     private async createIndex() {
         const indexExists = await this.elasticsearchService.indices.exists({ index: 'asset_telemetry' });

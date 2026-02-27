@@ -12,6 +12,7 @@ export class TelemetryController {
 
     @EventPattern('asset_telemetry')
     async handleTelemetry(@Payload() data: any) {
+        console.log('[Kafka] Received Asset Telemetry:', JSON.stringify(data, null, 2));
         await this.telemetryService.saveTelemetry(data);
     }
 

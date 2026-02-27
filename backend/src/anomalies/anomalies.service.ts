@@ -2,7 +2,6 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
-import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -17,7 +16,6 @@ export class AnomaliesService implements OnModuleInit, OnModuleDestroy {
         private readonly prisma: PrismaService,
         private readonly elasticsearchService: ElasticsearchService,
         private readonly eventsGateway: EventsGateway,
-        private readonly kafkaProducerService: KafkaProducerService,
         private readonly configService: ConfigService
     ) { }
 
@@ -42,64 +40,14 @@ export class AnomaliesService implements OnModuleInit, OnModuleDestroy {
             }
         };
 
-        if (nodeEnv !== 'production') {
-            this.startSimulation();
-        } else {
-            this.logger.log('Production mode: Simulation stream disabled.');
-        }
+        // Simulation stream is now handled by an external producer service.
     }
 
     async onModuleDestroy() {
         await this.flushAnomalies();
     }
 
-    private startSimulation() {
-        this.logger.log('Starting Anomaly Simulation from CSV...');
-        const dataDir = this.configService.get<string>('simulation.dataDir')!;
-        const fileName = this.configService.get<string>('simulation.files.anomaly')!;
-        const csvPath = path.join(process.cwd(), dataDir, fileName);
-        const intervalMs = this.configService.get<number>('simulation.intervals.anomaly')!;
 
-        setInterval(async () => {
-            try {
-                if (!fs.existsSync(csvPath)) {
-                    this.logger.warn(`CSV file not found at ${csvPath}`);
-                    return;
-                }
-
-                const fileContent = fs.readFileSync(csvPath, 'utf-8');
-                const lines = fileContent.split('\n').filter(line => line.trim() !== '');
-                // Skip header, pick random
-                const randomLine = lines[Math.floor(Math.random() * (lines.length - 1)) + 1];
-                const values = randomLine.split(',');
-
-                const assetId = values[0];
-                const type = values[1];
-                const severity = values[2];
-                const description = values[3];
-                const location = values[4];
-                const confidence = values[5];
-                const timestamp = values[6];
-
-                const payload = {
-                    timestamp: timestamp || new Date().toISOString(),
-                    severity,
-                    type,
-                    description,
-                    assetId,
-                    location,
-                    confidence,
-                    isResolved: 'false'
-                };
-
-                this.kafkaProducerService.emit('anomaly_events', payload);
-                this.logger.log(`Emitted CSV anomaly_events: ${assetId} - ${type}`);
-
-            } catch (error) {
-                this.logger.error('Error in simulation loop', error);
-            }
-        }, intervalMs);
-    }
 
     private async createIndex() {
         const indexExists = await this.elasticsearchService.indices.exists({ index: 'anomaly_events' });

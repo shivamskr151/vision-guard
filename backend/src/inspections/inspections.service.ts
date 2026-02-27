@@ -5,7 +5,6 @@ import { CreateInspectionDto } from './dto/create-inspection.dto';
 import { UpdateInspectionDto } from './dto/update-inspection.dto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { KafkaProducerService } from '../kafka/producer/kafka.producer.service';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { EventsGateway } from '../events/events.gateway';
 import { ConfigService } from '@nestjs/config';
@@ -20,7 +19,6 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private prisma: PrismaService,
     private readonly elasticsearchService: ElasticsearchService,
-    private readonly kafkaProducerService: KafkaProducerService,
     private readonly eventsGateway: EventsGateway,
     private readonly configService: ConfigService
   ) { }
@@ -46,63 +44,14 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
 
     await this.createIndex();
 
-    if (nodeEnv !== 'production') {
-      this.startInspectionStream();
-    } else {
-      this.logger.log('Production mode: Simulation stream disabled.');
-    }
+    // Simulation stream is now handled by an external producer service.
   }
 
   async onModuleDestroy() {
     await this.flushInspections();
   }
 
-  private startInspectionStream() {
-    this.logger.log('Starting Inspection Stream from CSV...');
-    const dataDir = this.configService.get<string>('simulation.dataDir')!;
-    const fileName = this.configService.get<string>('simulation.files.inspection')!;
-    const csvPath = path.join(process.cwd(), dataDir, fileName);
-    const intervalMs = this.configService.get<number>('simulation.intervals.inspection')!;
 
-    setInterval(async () => {
-      try {
-        if (!fs.existsSync(csvPath)) {
-          this.logger.warn(`CSV file not found at ${csvPath}`);
-          return;
-        }
-
-        const fileContent = fs.readFileSync(csvPath, 'utf-8');
-        const lines = fileContent.split('\n').filter((line) => line.trim() !== '');
-
-        // Skip header, pick random line to simulate continuous updates
-        const randomLine = lines[Math.floor(Math.random() * (lines.length - 1)) + 1];
-        const values = randomLine.split(',');
-
-        // Generate unique inspection ID for real-time creation
-        const uniqueInspectionId = this.inspectionCounter++;
-
-        const payload = {
-          timestamp: new Date().toISOString(),
-          inspectionId: uniqueInspectionId, // Use unique ID instead of CSV ID
-          assetId: values[1],
-          inspectorId: values[2],
-          type: values[3],
-          status: values[4],
-          result: values[5] === 'null' ? null : values[5],
-          scheduledDate: new Date().toISOString(), // Use current time
-          completedDate: values[7] === 'null' ? null : new Date().toISOString(), // Use current time if completed
-          durationSeconds: values[8] === 'null' ? null : parseInt(values[8]),
-          defects: parseInt(values[9]),
-          notes: values[10],
-        };
-
-        this.kafkaProducerService.emit('inspection_updates', payload);
-        this.logger.verbose(`Emitted NEW inspection for ${payload.assetId} (ID: ${payload.inspectionId})`);
-      } catch (error) {
-        this.logger.error('Error in inspection stream', error);
-      }
-    }, intervalMs);
-  }
 
   async createIndex() {
     const indexExists = await this.elasticsearchService.indices.exists({ index: 'inspections' });
@@ -365,7 +314,7 @@ export class InspectionsService implements OnModuleInit, OnModuleDestroy {
     const rawRisk = (activeAnomaliesCount * 1.5) + (overdueCount * 2.5);
     const riskIndex = parseFloat(Math.min(100, rawRisk).toFixed(1));
 
-    const slaCompliance = totalInRange > 0 ? ((completedInRange / totalInRange) * 100).toFixed(1) : '100.0';
+    const slaCompliance = totalInRange > 0 ? ((completedInRange / totalInRange) * 100).toFixed(1) : '0.0';
 
     const graphData = await this.getRealtimeGraphsData(range);
 

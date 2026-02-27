@@ -9,11 +9,13 @@ export class AssetsController {
 
     @EventPattern('asset_updates')
     async handleAssetUpdates(@Payload() data: any) {
+        console.log('[Kafka] Received Asset Update:', JSON.stringify(data, null, 2));
         await this.assetsService.updateAssetStatus(data);
     }
 
     @EventPattern('zone_updates')
     async handleZoneUpdates(@Payload() data: any) {
+        console.log('[Kafka] Received Zone Update:', JSON.stringify(data, null, 2));
         await this.assetsService.updateZone(data);
     }
 

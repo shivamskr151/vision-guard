@@ -36,6 +36,7 @@ export class EventsGateway
     // Method to emit events to all connected clients
     broadcast(event: string, data: any) {
         // Native WS doesn't have .emit with event name, so we stringify a JSON structure
+        this.logger.debug(`[WS Broadcast] Event: ${event}`);
         const message = JSON.stringify({ event, data });
         this.server.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {

@@ -237,7 +237,7 @@ export const InspectionsPage: React.FC = () => {
 
 
   // ... (KPI Logic remains same)
-  const kpiData = dashboardData?.kpi || { due: 0, overdue: 0, completed: 0, sla: 100, averageDuration: 0 };
+  const kpiData = dashboardData?.kpi || { due: 0, overdue: 0, completed: 0, sla: 0, averageDuration: 0 };
   const timelineData = useMemo(() => dashboardData?.timeline || [], [dashboardData]);
   const zoneCoverageData = useMemo(() => dashboardData?.zoneCoverage || [], [dashboardData]);
   const typeDistributionData = useMemo(() => dashboardData?.typeDistribution || [], [dashboardData]);

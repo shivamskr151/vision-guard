@@ -1,0 +1,557 @@
+{
+    "info": {
+        "name": "Vision Guard API - Standard Collection",
+        "description": "A professionally structured API collection for Vision Guard. Includes environment variables, pre-filled request bodies, and detailed descriptions for each endpoint.\n\n### Overview\n- **Base URL**: `http://localhost:3000` (configurable via `base_url` variable)\n- **Authentication**: All endpoints currently public (can be updated to use Bearer tokens)\n- **Content-Type**: `application/json` used for all POST/PATCH requests",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "01. Anomalies",
+            "description": "APIs related to anomaly detection, events, and camera feeds.",
+            "item": [
+                {
+                    "name": "Stats & Dashboards",
+                    "item": [
+                        {
+                            "name": "Get Summary Statistics",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/anomalies/stats?severity=critical&type=spill&asset=A123&camera=Gate Cam",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "anomalies",
+                                        "stats"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "severity",
+                                            "value": "critical",
+                                            "description": "Filter by severity (critical, warning, normal)"
+                                        },
+                                        {
+                                            "key": "type",
+                                            "value": "spill",
+                                            "description": "Filter by anomaly type"
+                                        },
+                                        {
+                                            "key": "asset",
+                                            "value": "A123",
+                                            "description": "Filter by Asset ID"
+                                        },
+                                        {
+                                            "key": "camera",
+                                            "value": "Gate Cam",
+                                            "description": "Filter by Camera Location"
+                                        }
+                                    ]
+                                },
+                                "description": "Returns a summary of anomalies for the dashboard cards, including total counts and critical counts."
+                            }
+                        },
+                        {
+                            "name": "Get Anomaly Filter Options",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/anomalies/filter-options",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "anomalies",
+                                        "filter-options"
+                                    ]
+                                },
+                                "description": "Fetches dynamic filter options (severities, types, assets, cameras) based on existing data."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Events",
+                    "item": [
+                        {
+                            "name": "List Anomaly Events",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/anomalies/events?severity=&type=&asset=&camera=",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "anomalies",
+                                        "events"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "severity",
+                                            "value": ""
+                                        },
+                                        {
+                                            "key": "type",
+                                            "value": ""
+                                        },
+                                        {
+                                            "key": "asset",
+                                            "value": ""
+                                        },
+                                        {
+                                            "key": "camera",
+                                            "value": ""
+                                        }
+                                    ]
+                                },
+                                "description": "Returns a list of the 50 most recent anomaly events with optional filtering."
+                            }
+                        },
+                        {
+                            "name": "Get Map Data",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/anomalies/map",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "anomalies",
+                                        "map"
+                                    ]
+                                },
+                                "description": "Returns coordinates and status data for plotting anomalies on the site map."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Cameras",
+                    "item": [
+                        {
+                            "name": "List All Cameras",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/anomalies/cameras",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "anomalies",
+                                        "cameras"
+                                    ]
+                                },
+                                "description": "Returns a list of unique cameras detected in the system along with their current anomaly status."
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "02. Assets",
+            "description": "APIs for managing industrial assets, schemas, and templates.",
+            "item": [
+                {
+                    "name": "Asset Management",
+                    "item": [
+                        {
+                            "name": "List Assets",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/assets?page=1&limit=10",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "assets"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1"
+                                        },
+                                        {
+                                            "key": "limit",
+                                            "value": "10"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create New Asset",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"assetId\": \"ASSET-001\",\n  \"name\": \"Pressure Vessel A1\",\n  \"type\": \"Pressure Vessel\",\n  \"zone\": \"North Wing\",\n  \"healthStatus\": \"good\",\n  \"criticality\": 8,\n  \"x\": 105.5,\n  \"y\": 200.2\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/assets",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "assets"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Asset",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"healthStatus\": \"warning\",\n  \"name\": \"Updated Asset Name\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/assets/:id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "assets",
+                                        ":id"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "id",
+                                            "value": "ASSET_DATABASE_ID"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Asset",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/assets/:id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "assets",
+                                        ":id"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "id",
+                                            "value": "ASSET_DATABASE_ID"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Library & Config",
+                    "item": [
+                        {
+                            "name": "Get Schema Library",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/assets/schemas",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "assets",
+                                        "schemas"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Inspection Templates",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/assets/templates",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "assets",
+                                        "templates"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Configuration",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/assets/config",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "assets",
+                                        "config"
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "03. Inspections",
+            "description": "APIs for scheduling and reporting inspections.",
+            "item": [
+                {
+                    "name": "Reports & Analytics",
+                    "item": [
+                        {
+                            "name": "Get Dashboard Data",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inspections/dashboard?range=7d",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inspections",
+                                        "dashboard"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "range",
+                                            "value": "7d",
+                                            "description": "Time range (e.g., 24h, 7d, 30d)"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Inspection Reports",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inspections/reports?page=1&limit=10&status=completed",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inspections",
+                                        "reports"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1"
+                                        },
+                                        {
+                                            "key": "limit",
+                                            "value": "10"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "completed"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Operations",
+                    "item": [
+                        {
+                            "name": "List Upcoming Inspections",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inspections/upcoming?page=1&limit=10",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inspections",
+                                        "upcoming"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1"
+                                        },
+                                        {
+                                            "key": "limit",
+                                            "value": "10"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create Inspection",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"assetId\": \"ASSET-001\",\n  \"scheduledDate\": \"2024-03-01T10:00:00Z\",\n  \"type\": \"Maintenance\",\n  \"status\": \"scheduled\",\n  \"notes\": \"Quarterly checkup\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/inspections",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inspections"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Trigger Sync",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inspections/sync",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inspections",
+                                        "sync"
+                                    ]
+                                },
+                                "description": "Trigger a synchronization process for inspection data."
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "04. Telemetry",
+            "description": "Real-time asset health and monitoring data.",
+            "item": [
+                {
+                    "name": "Get Latest Telemetry",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/telemetry/latest",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "telemetry",
+                                "latest"
+                            ]
+                        },
+                        "description": "Fetches the most recent telemetry readings for all assets."
+                    }
+                },
+                {
+                    "name": "Get Telemetry Stats",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/telemetry/stats",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "telemetry",
+                                "stats"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "05. System",
+            "item": [
+                {
+                    "name": "Health Check",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/",
+                            "host": [
+                                "{{base_url}}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Purge System Data",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/purge",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "purge"
+                            ]
+                        },
+                        "description": "CRITICAL: Deletes all data from the databases (Prisma & Elasticsearch)."
+                    }
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:3000",
+            "type": "string"
+        }
+    ]
+}

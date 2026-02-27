@@ -12,6 +12,7 @@ export class AnomaliesController {
 
     @EventPattern('anomaly_events')
     async handleAnomalyData(@Payload() data: any) {
+        console.log('[Kafka] Received Anomaly Event:', JSON.stringify(data, null, 2));
         await this.anomaliesService.processAnomalyData(data);
     }
 
