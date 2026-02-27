@@ -9,6 +9,7 @@ Vision Guard is a vision-based asset intelligence platform for monitoring facili
 - **Asset Registry** — Comprehensive management of assets with custom schemas and inspection templates.
 - **Inspections & Compliance** — Track due/overdue inspections, maintain compliance, and generate detailed reports.
 - **Telemetry Streaming** — Real-time data processing via Kafka for immediate insights.
+- **Simulation Engine** — Dedicated producer for simulating high-frequency asset, telemetry, and anomaly events.
 
 ## 🛠 Technology Stack
 
@@ -17,19 +18,17 @@ Vision Guard is a vision-based asset intelligence platform for monitoring facili
 - **Build Tool:** [Vite](https://vitejs.dev/)
 - **State/Routing:** [React Router 7](https://reactrouter.com/)
 - **Visualization:** [Recharts](https://recharts.org/)
-- **Testing:** [Vitest](https://vitest.dev/)
 
 ### Backend
 - **Framework:** [NestJS](https://nestjs.com/) (Node.js)
 - **ORM:** [Prisma](https://www.prisma.io/)
-- **Microservices:** [Kafka](https://kafka.apache.org/) (via KafkaJS)
 - **Search Engine:** [Elasticsearch](https://www.elastic.co/elasticsearch/)
 - **API Architecture:** Hybrid (REST + Kafka Microservices)
 
 ### Infrastructure
 - **Database:** MongoDB (via Prisma)
 - **Message Broker:** Apache Kafka & Zookeeper
-- **Logging/Analytics:** Elasticsearch & Kibana
+- **Simulation:** Standalone Node.js Kafka Producer
 - **Containerization:** Docker & Docker Compose
 
 ## ⚙️ Project Setup
@@ -65,7 +64,22 @@ docker-compose up -d
    npm run start:dev
    ```
 
-### 4. Frontend Setup
+### 4. Simulation Producer Setup
+1. Navigate to the simulation-producer directory:
+   ```bash
+   cd simulation-producer
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Configure environment variables in `.env`.
+4. Start the simulation:
+   ```bash
+   node index.js
+   ```
+
+### 5. Frontend Setup
 1. Navigate to the frontend directory:
    ```bash
    cd frontend
@@ -84,14 +98,17 @@ docker-compose up -d
 
 ```
 vision-guard/
-├── backend/          # NestJS application
-│   ├── src/          # API, Microservices, and Business Logic
-│   ├── prisma/       # Database schema and migrations
-│   └── Data/         # CSV files for data streaming/simulation
-├── frontend/         # React/Vite application
-│   ├── src/          # Components, Pages, and Hooks
-│   └── public/       # Static assets
-└── docker-compose.yml # Infrastructure orchestration
+├── backend/              # NestJS application
+│   ├── src/              # API, Microservices, and Business Logic
+│   └── prisma/           # Database schema
+├── frontend/             # React/Vite application
+│   └── src/              # Components, Pages, and Hooks
+├── simulation-producer/  # Standalone Kafka simulation engine
+│   ├── Data/             # CSV source data for simulations
+│   └── streams.config.js # Stream configuration logic
+├── docker-compose.yml    # Infrastructure orchestration
+├── Vision-Guard-API.postman_collection.json # API testing collection
+└── Vision-Guard-Local.postman_environment.json # Environment settings
 ```
 
 ## 🧪 Testing
@@ -101,3 +118,4 @@ vision-guard/
 
 ## 📄 License
 Private.
+
