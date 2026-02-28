@@ -140,6 +140,8 @@ export interface RegistryAsset {
   lastInspectionDate?: string
   inspectionFrequency?: number
   assignedTemplates?: string[] // IDs of assigned templates
+  x: number
+  y: number
 }
 
 export interface SchemaLibraryItem {

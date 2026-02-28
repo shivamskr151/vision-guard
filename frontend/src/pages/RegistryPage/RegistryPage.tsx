@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import type { RegistryTabId, RegistryAsset, AssetStatus, SchemaLibraryItem, CustomFieldItem, InspectionTemplateItem, InspectionChecklistItem } from '@/types'
 import { REGISTRY_TABS, CUSTOM_FIELDS_INITIAL, INSPECTION_CHECKLIST_INITIAL } from '@/data/registryConstants'
 import styles from './RegistryPage.module.css'
@@ -456,7 +456,23 @@ function InspectionTemplateConfigSection({
   )
 }
 
-function AssetListTable({ assets, onEdit, onDelete }: { assets: RegistryAsset[], onEdit: (asset: RegistryAsset) => void, onDelete: (id: string | number) => void }) {
+function AssetListTable({
+  assets,
+  onEdit,
+  onDelete,
+  onSelect,
+  selectedAsset,
+  onCloseDetail,
+  cameras
+}: {
+  assets: RegistryAsset[],
+  onEdit: (asset: RegistryAsset) => void,
+  onDelete: (id: string | number) => void,
+  onSelect: (asset: RegistryAsset) => void,
+  selectedAsset: RegistryAsset | null,
+  onCloseDetail: () => void,
+  cameras: any[]
+}) {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
@@ -480,64 +496,185 @@ function AssetListTable({ assets, onEdit, onDelete }: { assets: RegistryAsset[],
         </thead>
         <tbody>
           {assets.map((asset) => (
-            <tr key={asset.id}>
-              <td className={styles.assetId}>{asset.assetId}</td>
-              <td className={styles.name}>{asset.name}</td>
-              <td>{asset.type}</td>
-              <td>
-                <span className={styles.zoneCell}>
-                  <span className={styles.zoneIcon} aria-hidden>
-                    <IconLocation />
+            <Fragment key={asset.id}>
+              <tr
+                onClick={() => onSelect(asset)}
+                className={[
+                  styles.clickableRow,
+                  selectedAsset?.id === asset.id ? styles.rowSelected : ''
+                ].join(' ')}
+              >
+                <td className={styles.assetId}>{asset.assetId}</td>
+                <td className={styles.name}>{asset.name}</td>
+                <td>{asset.type}</td>
+                <td>
+                  <span className={styles.zoneCell}>
+                    <span className={styles.zoneIcon} aria-hidden>
+                      <IconLocation />
+                    </span>
+                    {asset.zone}
                   </span>
-                  {asset.zone}
-                </span>
-              </td>
-              <td>
-                <span className={[styles.healthBadge, healthClass[asset.healthStatus]].join(' ')}>
-                  {healthLabel[asset.healthStatus]}
-                </span>
-              </td>
-              <td>
-                <span className={styles.camerasCell}>
-                  <span className={styles.cameraIcon} aria-hidden>
-                    <IconCamera />
+                </td>
+                <td>
+                  <span className={[styles.healthBadge, healthClass[asset.healthStatus]].join(' ')}>
+                    {healthLabel[asset.healthStatus]}
                   </span>
-                  {asset.linkedCameras}
-                </span>
-              </td>
-              <td>
-                <div className={styles.criticalityCell}>
-                  <div className={styles.criticalityBar}>
-                    <div
-                      className={styles.criticalityFill}
-                      style={{ width: `${(asset.criticality / asset.criticalityMax) * 100}%` }}
-                      role="progressbar"
-                      aria-valuenow={asset.criticality}
-                      aria-valuemin={0}
-                      aria-valuemax={asset.criticalityMax}
-                    />
+                </td>
+                <td>
+                  <span className={styles.camerasCell}>
+                    <span className={styles.cameraIcon} aria-hidden>
+                      <IconCamera />
+                    </span>
+                    {asset.linkedCameras}
+                  </span>
+                </td>
+                <td>
+                  <div className={styles.criticalityCell}>
+                    <div className={styles.criticalityBar}>
+                      <div
+                        className={styles.criticalityFill}
+                        style={{ width: `${(asset.criticality / asset.criticalityMax) * 100}%` }}
+                        role="progressbar"
+                        aria-valuenow={asset.criticality}
+                        aria-valuemin={0}
+                        aria-valuemax={asset.criticalityMax}
+                      />
+                    </div>
+                    <span className={styles.criticalityScore}>
+                      {asset.criticality}/{asset.criticalityMax}
+                    </span>
                   </div>
-                  <span className={styles.criticalityScore}>
-                    {asset.criticality}/{asset.criticalityMax}
-                  </span>
-                </div>
-              </td>
-              <td>
-                <div className={styles.actionsCell}>
-                  <button type="button" className={styles.actionBtn} onClick={() => onEdit(asset)} aria-label={`Edit ${asset.name}`}>
-                    <IconEdit />
-                  </button>
-                  <button type="button" className={styles.actionBtn} onClick={() => onDelete(asset.id)} aria-label={`Delete ${asset.name}`}>
-                    <IconDelete />
-                  </button>
-                </div>
-              </td>
-            </tr>
+                </td>
+                <td>
+                  <div className={styles.actionsCell}>
+                    <button type="button" className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); onEdit(asset); }} aria-label={`Edit ${asset.name}`}>
+                      <IconEdit />
+                    </button>
+                    <button type="button" className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); onDelete(asset.id); }} aria-label={`Delete ${asset.name}`}>
+                      <IconDelete />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {selectedAsset?.id === asset.id && (
+                <tr className={styles.detailRow}>
+                  <td colSpan={8} className={styles.detailTd}>
+                    <AssetDetailCard
+                      asset={asset}
+                      onClose={onCloseDetail}
+                      cameras={cameras}
+                    />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>
     </div>
   )
+}
+
+function AssetDetailCard({
+  asset,
+  onClose,
+  cameras
+}: {
+  asset: RegistryAsset,
+  onClose: () => void,
+  cameras: any[]
+}) {
+  const anomalyCameras = cameras.filter(c => c.assetName === asset.assetId);
+
+  // If we have cameras from anomaly service, use those.
+  // Otherwise, if the DB count > 0, generate placeholders to stay consistent with the table.
+  const displayCameras = anomalyCameras.length > 0
+    ? anomalyCameras.map(c => ({ id: c.id, name: c.name }))
+    : Array.from({ length: asset.linkedCameras || 0 }).map((_, i) => ({
+      id: `virtual-${asset.id}-${i}`,
+      name: `${asset.zone || 'Zone'} Cam ${i + 1}`
+    }));
+
+  const nextInspectionDate = asset.lastInspectionDate && asset.inspectionFrequency
+    ? new Date(new Date(asset.lastInspectionDate).getTime() + asset.inspectionFrequency * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB')
+    : 'N/A';
+
+  return (
+    <div className={styles.detailCard}>
+      <header className={styles.detailCardHeader}>
+        <div className={styles.detailTitleArea}>
+          <h2>{asset.name}</h2>
+        </div>
+        <button className={styles.detailCloseBtn} onClick={onClose}>Close</button>
+      </header>
+
+      <div className={styles.detailContent}>
+        <div className={styles.detailGrid}>
+          <div className={styles.detailCol}>
+            <section className={styles.detailSection}>
+              <h3 className={styles.detailSectionTitle}>Basic Information</h3>
+              <div className={styles.detailList}>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Asset ID:</span>
+                  <span className={styles.detailValue}>{asset.assetId}</span>
+                </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Type:</span>
+                  <span className={styles.detailValue}>{asset.type}</span>
+                </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Zone:</span>
+                  <span className={styles.detailValue}>{asset.zone}</span>
+                </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Inspection Frequency:</span>
+                  <span className={styles.detailValue}>{asset.inspectionFrequency ? `${asset.inspectionFrequency} days` : 'N/A'}</span>
+                </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Next Inspection:</span>
+                  <span className={styles.detailValue}>{nextInspectionDate}</span>
+                </div>
+              </div>
+            </section>
+
+            <section className={styles.detailSection}>
+              <h3 className={styles.detailSectionTitle}>Linked Cameras</h3>
+              <div className={styles.detailCameraList}>
+                {displayCameras.length > 0 ? displayCameras.map(cam => (
+                  <div key={cam.id} className={styles.detailCameraItem}>
+                    <IconCamera />
+                    <span>{cam.name}</span>
+                  </div>
+                )) : <p className={styles.noData}>No linked cameras</p>}
+              </div>
+            </section>
+          </div>
+
+          <div className={styles.detailCol}>
+            <section className={styles.detailSection}>
+              <h3 className={styles.detailSectionTitle}>Custom Fields</h3>
+              <div className={styles.detailList}>
+                {asset.customData && Object.entries(asset.customData).length > 0 ? Object.entries(asset.customData).map(([key, value]) => (
+                  <div key={key} className={styles.detailItem}>
+                    <span className={styles.detailLabel}>{key}:</span>
+                    <span className={styles.detailValue}>{String(value)}</span>
+                  </div>
+                )) : <p className={styles.noData}>No custom fields defined</p>}
+              </div>
+            </section>
+
+            <section className={styles.detailSection}>
+              <h3 className={styles.detailSectionTitle}>Location</h3>
+              <div className={styles.detailItem}>
+                <span className={styles.detailLabel}>Coordinates:</span>
+                <span className={styles.detailValue}>({asset.x}, {asset.y})</span>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function RegistryPage() {
@@ -567,6 +704,7 @@ export function RegistryPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingAsset, setEditingAsset] = useState<RegistryAsset | null>(null)
+  const [selectedAsset, setSelectedAsset] = useState<RegistryAsset | null>(null)
 
 
 
@@ -719,6 +857,10 @@ export function RegistryPage() {
                   })}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onSelect={(asset) => setSelectedAsset(selectedAsset?.id === asset.id ? null : asset)}
+                  selectedAsset={selectedAsset}
+                  onCloseDetail={() => setSelectedAsset(null)}
+                  cameras={cameras}
                 />
                 <Pagination
                   currentPage={currentPage}
