@@ -36,7 +36,7 @@ async function bootstrap() {
     transport: Transport.KAFKA,
     options: {
       client: {
-        brokers: [kafkaBrokers],
+        brokers: kafkaBrokers.split(','),
       },
       consumer: {
         groupId: configService.get<string>('kafka.consumerGroup')!,

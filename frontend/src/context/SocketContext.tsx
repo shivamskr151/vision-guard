@@ -22,16 +22,18 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         // Create native WebSocket connection
         // Assuming backend runs on same host/port logic or use env
         // VITE_API_URL is mostly http://... so we replace http with ws
-        const apiUrl = config.API_URL;
-        let wsUrl = apiUrl.replace(/^http/, 'ws');
+        // Use WS_URL from config if available, otherwise derive from API_URL
+        let wsUrl = config.WS_URL || config.API_URL.replace(/^http/, 'ws');
 
         // Dynamically replace localhost with the actual hostname the app is served from
         if (wsUrl.includes('localhost') || wsUrl.includes('127.0.0.1')) {
             wsUrl = wsUrl.replace(/localhost|127\.0\.0\.1/, window.location.hostname);
         }
 
-        // Add the project-specific namespace (vision-guard)
-        wsUrl += wsUrl.endsWith('/') ? 'vision-guard' : '/vision-guard';
+        // Only append namespace if not already present in the URL
+        if (!wsUrl.includes('vision-guard')) {
+            wsUrl += wsUrl.endsWith('/') ? 'vision-guard' : '/vision-guard';
+        }
 
         let ws: WebSocket;
         let reconnectTimer: NodeJS.Timeout;

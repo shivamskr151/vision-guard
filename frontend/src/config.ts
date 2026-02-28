@@ -1,5 +1,5 @@
 const getApiUrl = () => {
-    const configuredUrl = (window as any).env?.VITE_API_URL || import.meta.env.VITE_API_URL || '';
+    const configuredUrl = import.meta.env.VITE_API_URL || '';
 
     // Fallback to local 3000 if in dev and nothing specified, but user wanted no hardcoding.
     // So we'll just be safe with strings.
@@ -21,5 +21,5 @@ const getApiUrl = () => {
 
 export const config = {
     API_URL: getApiUrl(),
-    // Add other variables here if needed
+    WS_URL: import.meta.env.VITE_WS_URL || '',
 };
